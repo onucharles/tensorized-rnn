@@ -122,4 +122,4 @@ def train(run_id: str, clean_data_root: Path, models_dir: Path, umap_every: int,
             }, backup_fpath)
             
         profiler.tick("Extras (visualizations, saving)")
-        
+        # if step == 50: break

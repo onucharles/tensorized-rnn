@@ -1,6 +1,4 @@
 
-# python encoder_preprocess.py datasets_root="D:\Users\Charley\Documents\Esperanza\repos\_datasets" -o="D:\Users\Charley\Documents\Esperanza\repos\_datasets_derived\librispeech_tisv" -d="librispeech_other"
-
 from encoder.preprocess import preprocess_librispeech, preprocess_voxceleb1, preprocess_voxceleb2
 from utils.argutils import print_args
 from pathlib import Path
@@ -27,7 +25,7 @@ if __name__ == "__main__":
                     "    -dev",
         formatter_class=MyFormatter
     )
-    parser.add_argument("datasets_root", type=Path, help=\
+    parser.add_argument("-r", "--datasets_root", type=Path, help=\
         "Path to the directory containing your LibriSpeech/TTS and VoxCeleb datasets.")
     parser.add_argument("-o", "--out_dir", type=Path, default=argparse.SUPPRESS, help=\
         "Path to the output directory that will contain the mel spectrograms. If left out, "
@@ -46,6 +44,7 @@ if __name__ == "__main__":
     args.datasets = args.datasets.split(",")
     if not hasattr(args, "out_dir"):
         args.out_dir = args.datasets_root.joinpath("SV2TTS", "encoder")
+    print(args.datasets_root)
     assert args.datasets_root.exists()
     args.out_dir.mkdir(exist_ok=True, parents=True)
     
