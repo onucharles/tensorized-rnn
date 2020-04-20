@@ -60,62 +60,59 @@ class SpeakerEncoder(nn.Module):
         
         return embeds
     
-    def similarity_matrix(self, embeds):
+    def similarity_matrix(self, verification_embeds, enrollment_embeds=None):
         """
         Computes the similarity matrix according the section 2.1 of GE2E.
 
-        :param embeds: the embeddings as a tensor of shape (speakers_per_batch, 
+        :param verification_embeds: the verification embeddings as a tensor of shape (speakers_per_batch,
         utterances_per_speaker, embedding_size)
+        :param enrollment_embeds: the enrollment embeddings as a tensor of shape (speakers_per_batch,
+        utterances_per_speaker, embedding_size). If None (eg during training), uses verification_embeds for enrollment.
         :return: the similarity matrix as a tensor of shape (speakers_per_batch,
         utterances_per_speaker, speakers_per_batch)
         """
-        speakers_per_batch, utterances_per_speaker = embeds.shape[:2]
-        
-        # Inclusive centroids (1 per speaker). Cloning is needed for reverse differentiation
-        centroids_incl = torch.mean(embeds, dim=1, keepdim=True)
-        centroids_incl = centroids_incl.clone() / torch.norm(centroids_incl, dim=2, keepdim=True)
-
-        # Exclusive centroids (1 per utterance)
-        centroids_excl = (torch.sum(embeds, dim=1, keepdim=True) - embeds)
-        centroids_excl /= (utterances_per_speaker - 1)
-        centroids_excl = centroids_excl.clone() / torch.norm(centroids_excl, dim=2, keepdim=True)
-
-        # Similarity matrix. The cosine similarity of already 2-normed vectors is simply the dot
-        # product of these vectors (which is just an element-wise multiplication reduced by a sum).
-        # We vectorize the computation for efficiency.
+        speakers_per_batch, utterances_per_speaker = verification_embeds.shape[:2]
         sim_matrix = torch.zeros(speakers_per_batch, utterances_per_speaker,
                                  speakers_per_batch).to(self.loss_device)
-        mask_matrix = 1 - np.eye(speakers_per_batch, dtype=np.int)
-        for j in range(speakers_per_batch):
-            mask = np.where(mask_matrix[j])[0]
-            sim_matrix[mask, :, j] = (embeds[mask] * centroids_incl[j]).sum(dim=2)
-            sim_matrix[j, :, j] = (embeds[j] * centroids_excl[j]).sum(dim=1)
-        
-        ## Even more vectorized version (slower maybe because of transpose)
-        # sim_matrix2 = torch.zeros(speakers_per_batch, speakers_per_batch, utterances_per_speaker
-        #                           ).to(self.loss_device)
-        # eye = np.eye(speakers_per_batch, dtype=np.int)
-        # mask = np.where(1 - eye)
-        # sim_matrix2[mask] = (embeds[mask[0]] * centroids_incl[mask[1]]).sum(dim=2)
-        # mask = np.where(eye)
-        # sim_matrix2[mask] = (embeds * centroids_excl).sum(dim=2)
-        # sim_matrix2 = sim_matrix2.transpose(1, 2)
+
+        # Inclusive centroids (1 per speaker). Cloning is needed for reverse differentiation
+        centroids_incl = torch.mean(verification_embeds, dim=1, keepdim=True)
+        centroids_incl = centroids_incl.clone() / torch.norm(centroids_incl, dim=2, keepdim=True)
+
+        if enrollment_embeds is None:
+            # Exclusive centroids (1 per utterance)
+            centroids_excl = (torch.sum(verification_embeds, dim=1, keepdim=True) - verification_embeds)
+            centroids_excl /= (utterances_per_speaker - 1)
+            centroids_excl = centroids_excl.clone() / torch.norm(centroids_excl, dim=2, keepdim=True)
+
+            # Similarity matrix. The cosine similarity of already 2-normed vectors is simply the dot
+            # product of these vectors (which is just an element-wise multiplication reduced by a sum).
+            mask_matrix = 1 - np.eye(speakers_per_batch, dtype=np.int)
+            for j in range(speakers_per_batch):
+                mask = np.where(mask_matrix[j])[0]
+                sim_matrix[mask, :, j] = (verification_embeds[mask] * centroids_incl[j]).sum(dim=2)
+                sim_matrix[j, :, j] = (verification_embeds[j] * centroids_excl[j]).sum(dim=1)
+        else:
+            centroids = torch.mean(enrollment_embeds, dim=1, keepdim=True)
+            centroids = centroids.clone() / torch.norm(centroids, dim=2, keepdim=True)
+            for j in range(speakers_per_batch):
+                sim_matrix[:, :, j] = (verification_embeds * centroids[j, :, :]).sum(dim=2)
         
         sim_matrix = sim_matrix * self.similarity_weight + self.similarity_bias
         return sim_matrix
     
-    def loss(self, embeds):
+    def loss(self, verification_embeds, enrollment_embeds=None):
         """
         Computes the softmax loss according the section 2.1 of GE2E.
         
-        :param embeds: the embeddings as a tensor of shape (speakers_per_batch, 
+        :param verification_embeds: the embeddings as a tensor of shape (speakers_per_batch, 
         utterances_per_speaker, embedding_size)
         :return: the loss and the EER for this batch of embeddings.
         """
-        speakers_per_batch, utterances_per_speaker = embeds.shape[:2]
+        speakers_per_batch, utterances_per_speaker = verification_embeds.shape[:2]
         
         # Loss
-        sim_matrix = self.similarity_matrix(embeds)
+        sim_matrix = self.similarity_matrix(verification_embeds, enrollment_embeds)
         sim_matrix = sim_matrix.reshape((speakers_per_batch * utterances_per_speaker, 
                                          speakers_per_batch))
         ground_truth = np.repeat(np.arange(speakers_per_batch), utterances_per_speaker)

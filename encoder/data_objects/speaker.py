@@ -27,7 +27,7 @@ class Speaker:
         the number of utterances available.
         :param n_frames: The number of frames in the partial utterance.
         :return: A list of tuples (utterance, frames, range) where utterance is an Utterance, 
-        frames are the frames of the partial utterances and range is the range of the partial 
+        frames are the frames of the partial utterance and range is the range of the partial
         utterance with regard to the complete utterance.
         """
         if self.utterances is None:
@@ -36,5 +36,26 @@ class Speaker:
         utterances = self.utterance_cycler.sample(count)
 
         a = [(u,) + u.random_partial(n_frames) for u in utterances]
+
+        return a
+
+    def random_complete(self, count):
+        """
+        Samples a batch of <count> unique COMPLETE utterances from the disk in a way that all
+        utterances come up at least once every two cycles and in a random order every time.
+
+        :param count: The number of partial utterances to sample from the set of utterances from
+        that speaker. Utterances are guaranteed not to be repeated if <count> is not larger than
+        the number of utterances available.
+        :param n_frames: The number of frames in the partial utterance.
+        :return: A list of tuples (utterance, frames) where utterance is an Utterance,
+        frames are the frames of the partial utterance.
+        """
+        if self.utterances is None:
+            self._load_utterances()
+
+        utterances = self.utterance_cycler.sample(count)
+
+        a = [(u,) + u.get_frames() for u in utterances]
 
         return a

@@ -64,7 +64,7 @@ def train(run_id: str, clean_data_root: Path, models_dir: Path, umap_every: int,
     vis.log_implementation({"Device": device_name})
     
     # Training loop
-    profiler = Profiler(summarize_every=10, disabled=False)
+    profiler = Profiler(summarize_every=10, disabled=True)
     for step, speaker_batch in enumerate(loader, init_step):
         profiler.tick("Blocking, waiting for batch (threaded)")
         
