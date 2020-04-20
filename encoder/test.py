@@ -13,7 +13,7 @@ _device = None # type: torch.device
 def test(test_data_dir: Path, model_path: Path, n_workers: int):
 
     # create dataset and data loader
-    dataset = SpeakerVerificationTestSet(test_data_dir)
+    dataset = SpeakerVerificationDataset(test_data_dir)
     loader = SpeakerVerificationDataLoader(
         dataset=dataset,
         speakers_per_batch=test_speakers_per_batch,
@@ -46,6 +46,11 @@ def test(test_data_dir: Path, model_path: Path, n_workers: int):
         for s in speaker_batch.speakers:
             print("\t-", s.name)
 
+        for s, partials in speaker_batch.partials.items():
+            for partial in partials:
+                u, frames, slice = partial
+                print("\t\t- name: {}\tslice: {}".format(u.frames_fpath.name, slice))
+
         inputs = torch.from_numpy(speaker_batch.data).to(_device)    # shape: (n_speakers * n_utter, n_frames, n_mels)
         embeddings = _model(inputs)  # shape: (n_speakers * n_utter, d_vector_size)
         embeddings = embeddings.view((test_speakers_per_batch, test_utterances_per_speaker, -1)).to(loss_device)    # shape: (n_speakers, n_utter, d_vector_size)
@@ -58,6 +63,7 @@ def test(test_data_dir: Path, model_path: Path, n_workers: int):
 
         avg_loss += loss
         avg_eer += eer
+        break
 
     avg_loss /= step + 1
     avg_eer /= step + 1

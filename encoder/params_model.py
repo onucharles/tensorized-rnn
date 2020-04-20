@@ -11,6 +11,6 @@ speakers_per_batch = 64
 utterances_per_speaker = 10
 
 ## Test parameters
-test_speakers_per_batch = 10
-test_utterances_per_speaker = 10
+test_speakers_per_batch = 5
+test_utterances_per_speaker = 3
 

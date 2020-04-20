@@ -1,5 +1,5 @@
 import numpy as np
-
+import random
 
 class Utterance:
     def __init__(self, frames_fpath, wave_fpath):
@@ -21,6 +21,6 @@ class Utterance:
         if frames.shape[0] == n_frames:
             start = 0
         else:
-            start = np.random.randint(0, frames.shape[0] - n_frames)
+            start = random.randint(0, frames.shape[0] - n_frames)
         end = start + n_frames
         return frames[start:end], (start, end)
