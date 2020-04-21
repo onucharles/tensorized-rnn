@@ -42,7 +42,6 @@ def test(test_data_dir: Path, model_path: Path, n_workers: int):
     print("Running test with speakers_per_batch: {}, utterances_per_speaker: {}"
             .format(test_speakers_per_batch, test_utterances_per_speaker))
 
-
     avg_loss, avg_eer = 0, 0
     n_epochs = 10
     for epoch in range(n_epochs):
@@ -59,31 +58,10 @@ def test(test_data_dir: Path, model_path: Path, n_workers: int):
             loss, eer = _model.loss(verification_embeds, enrollment_embeds)
             #print("loss: {}\tEER: {}".format(loss, eer))
 
-            avg_loss += loss
+            avg_loss += loss.item()
             avg_eer += eer
 
     avg_loss /= (step + 1) * n_epochs
     avg_eer /= (step + 1) * n_epochs
     print("Average loss: {}\t\tAverage EER: {}".format(avg_loss, avg_eer))
     return avg_loss, avg_eer
-
-    # avg_loss, avg_eer = 0, 0
-    # for step, speaker_batch in enumerate(loader):
-        # print("---------Step {}----------".format(step))
-
-        # inputs = torch.from_numpy(speaker_batch.data).to(_device)    # shape: (n_speakers * n_utter, n_frames, n_mels)
-        # embeddings = _model(inputs)  # shape: (n_speakers * n_utter, d_vector_size)
-        # embeddings = embeddings.view((test_speakers_per_batch, test_utterances_per_speaker, -1)).to(loss_device)    # shape: (n_speakers, n_utter, d_vector_size)
-
-        # # split each speakers' utterances into enrollment and verification sets.
-        # verification_embeds, enrollment_embeds = torch.chunk(embeddings, 2, dim=1)
-
-        # loss, eer = _model.loss(verification_embeds, enrollment_embeds)
-        # print("loss: {}\tEER: {}".format(loss, eer))
-
-        # avg_loss += loss
-        # avg_eer += eer
-
-    # avg_loss /= step + 1
-    # avg_eer /= step + 1
-    # print("Average loss: {}\tAverage EER: {}".format(avg_loss, avg_eer))

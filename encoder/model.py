@@ -7,20 +7,27 @@ from scipy.optimize import brentq
 from torch import nn
 import numpy as np
 import torch
+from t3nsor.layers import TTLinear
 
 
 class SpeakerEncoder(nn.Module):
-    def __init__(self, device, loss_device):
+    def __init__(self, device, loss_device, use_tt=False, n_cores=3, tt_rank=8):
         super().__init__()
         self.loss_device = loss_device
         
-        # Network defition
+        # Network definition
         self.lstm = nn.LSTM(input_size=mel_n_channels,
                             hidden_size=model_hidden_size, 
                             num_layers=model_num_layers, 
                             batch_first=True).to(device)
-        self.linear = nn.Linear(in_features=model_hidden_size, 
+        if not use_tt:
+            self.linear = nn.Linear(in_features=model_hidden_size,
                                 out_features=model_embedding_size).to(device)
+        else:
+            self.linear = TTLinear(in_features=model_hidden_size, out_features=model_embedding_size,
+                                   bias=True, auto_shapes=True, d=n_cores, tt_rank=tt_rank).to(device)
+            print("Encoding linear layer as a tensor-train...")
+
         self.relu = torch.nn.ReLU().to(device)
         
         # Cosine similarity scaling (with fixed initial parameter values)

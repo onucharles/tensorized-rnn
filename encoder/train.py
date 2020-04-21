@@ -3,6 +3,7 @@ from encoder.data_objects import SpeakerVerificationDataLoader, SpeakerVerificat
 from encoder.params_model import *
 from encoder.model import SpeakerEncoder
 from utils.profiler import Profiler
+from utils.modelutils import count_model_params
 from pathlib import Path
 import torch
 
@@ -33,7 +34,10 @@ def train(run_id: str, clean_data_root: Path, models_dir: Path, umap_every: int,
     loss_device = torch.device("cpu")
     
     # Create the model and the optimizer
-    model = SpeakerEncoder(device, loss_device)
+    model = SpeakerEncoder(device, loss_device, use_tt=use_tt, n_cores=n_cores, tt_rank=tt_rank)
+    n_trainable, n_nontrainable = count_model_params(model)
+    print("Model created. Trainable params: {}\tNon-trainable params: {}\t Total: {}"
+          .format(n_trainable, n_nontrainable, n_trainable + n_nontrainable))
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate_init)
     init_step = 1
     
@@ -122,4 +126,4 @@ def train(run_id: str, clean_data_root: Path, models_dir: Path, umap_every: int,
             }, backup_fpath)
             
         profiler.tick("Extras (visualizations, saving)")
-        # if step == 50: break
+        break

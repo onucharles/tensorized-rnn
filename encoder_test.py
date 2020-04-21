@@ -49,8 +49,8 @@ if __name__ == "__main__":
         print("-----Testing model: {}--------".format(count))
         args.model_path = model_path
         # print_args(args, parser)
-        avg_loss, avg_eer = test(**vars(args)) 
-        result[model_path.name] = (avg_loss.item(), avg_eer)
+        avg_loss, avg_eer = test(**vars(args))
+        result[model_path.name] = (avg_loss, avg_eer)
         count += 1
 
     print(result)
