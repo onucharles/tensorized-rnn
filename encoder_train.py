@@ -15,12 +15,13 @@ if __name__ == "__main__":
         "saved, the training will restart from there. Pass -f to overwrite saved states and "
         "restart from scratch.")
     parser.add_argument("--clean_data_root", type=Path, help= \
-        "Path to the output directory of encoder_preprocess.py. If you left the default "
-        "output directory when preprocessing, it should be <datasets_root>/SV2TTS/encoder/.")
+        "Path to the output directory of encoder_preprocess.py for training set.")
+    parser.add_argument("--clean_data_root_val", type=Path, help= \
+        "Path to the output directory of encoder_preprocess.py for validation set.")
     parser.add_argument("-m", "--models_dir", type=Path, default="encoder/saved_models/", help=\
         "Path to the output directory that will contain the saved model weights, as well as "
         "backups of those weights and plots generated during training.")
-    parser.add_argument("-v", "--vis_every", type=int, default=10, help= \
+    parser.add_argument("-v", "--val_every", type=int, default=50, help= \
         "Number of steps between updates of the loss and the plots.")
     parser.add_argument("-u", "--umap_every", type=int, default=100, help= \
         "Number of steps between updates of the umap projection. Set to 0 to never update the "
@@ -33,9 +34,8 @@ if __name__ == "__main__":
         "model.")
     parser.add_argument("-f", "--force_restart", action="store_true", help= \
         "Do not load any saved model.")
-    parser.add_argument("--visdom_server", type=str, default="http://localhost")
-    parser.add_argument("--no_visdom", action="store_true", help= \
-        "Disable visdom.")
+    parser.add_argument("--no_comet", action="store_true", help= \
+        "Disable comet.")
     args = parser.parse_args()
     
     # Process the arguments

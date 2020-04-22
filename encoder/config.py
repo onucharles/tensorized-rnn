@@ -1,3 +1,7 @@
+COMET_API_KEY = "w7QuiECYXbNiOozveTpjc9uPg"
+COMET_WORKSPACE = "onucharles"
+PROJECT_NAME = "speech-model-compression"
+
 librispeech_datasets = {
     "train": {
         "clean": ["LibriSpeech/train-clean-100", "LibriSpeech/train-clean-360"],

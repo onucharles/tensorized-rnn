@@ -6,22 +6,26 @@ from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
 
 class SpeakerVerificationDataset(Dataset):
-    def __init__(self, datasets_root, dataset_len=1e10):
+    def __init__(self, datasets_root, n_epochs):
         """
-
         :param datasets_root:
-        :param dataset_len: Can be larger than the number of speakers since speakers will be
-        sampled with (constrained) replacement. If None, it is set to the no of speakers.
+        :param n_epochs:
         """
+        # :param dataset_len: Can be larger than the number of speakers since speakers will be
+        #         sampled with (constrained) replacement. If None, it is set to the no of speakers.
         self.root = datasets_root
         speaker_dirs = [f for f in self.root.glob("*") if f.is_dir()]
-        if len(speaker_dirs) == 0:
+        n_speakers = len(speaker_dirs)
+        if n_speakers == 0:
             raise Exception("No speakers found. Make sure you are pointing to the directory "
                             "containing all preprocessed speaker directories.")
         self.speakers = [Speaker(speaker_dir) for speaker_dir in speaker_dirs]
 
         self.speaker_cycler = RandomCycler(self.speakers)
-        self.dataset_len = dataset_len if dataset_len is not None else len(speaker_dirs)
+        self.dataset_len = n_epochs * n_speakers
+        # self.dataset_len = dataset_len if dataset_len is not None else len(speaker_dirs)
+        print("Train dataset length is: {}, ie no_of_epochs({}) x no_of_speakers({})".
+              format(self.dataset_len, n_epochs, n_speakers))
 
     def __len__(self):
         return int(self.dataset_len)
@@ -49,7 +53,7 @@ class SpeakerVerificationTestSet(Dataset):
                             "containing all preprocessed speaker directories.")
         self.speakers = [Speaker(speaker_dir) for speaker_dir in speaker_dirs]
         self.dataset_len = len(self.speakers)
-        print("Dataset length is: {}".format(self.dataset_len))
+        print("Test dataset length is: {}".format(self.dataset_len))
 
     def __len__(self):
         return self.dataset_len
