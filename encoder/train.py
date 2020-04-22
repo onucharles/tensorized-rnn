@@ -10,9 +10,11 @@ import torch
 from .test import evaluate
 
 
+# def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
+#           umap_every: int, save_every: int, backup_every: int, val_every: int,
+#           force_restart: bool, no_comet: bool):
 def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
-          umap_every: int, save_every: int, backup_every: int, val_every: int,
-          force_restart: bool, no_comet: bool):
+          umap_every: int, val_every: int, force_restart: bool, no_comet: bool):
     # create comet logger.
     logger = CometLogger(no_comet)
     run_id = logger.get_key()
@@ -26,6 +28,7 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
         setup_model_and_optimizer(device, loss_device, force_restart, state_fpath, run_id)
 
     # Training loop
+    best_val_eer = 1
     profiler = Profiler(summarize_every=10, disabled=True)
     for step, speaker_batch in enumerate(train_loader, init_step):
         model.train()
@@ -60,6 +63,14 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
             logger.log_metrics({"EER": avg_val_eer, "loss": avg_val_loss}, prefix="val", step=step)
             print("Step: {} - Validation Average loss: {}\t\tAverage EER: {}".format(step, avg_val_loss, avg_val_eer))
 
+            if avg_val_eer < best_val_eer:  # save current model
+                print("Saving the model (step %d)" % step)
+                torch.save({
+                    "step": step + 1,
+                    "model_state": model.state_dict(),
+                    "optimizer_state": optimizer.state_dict(),
+                }, state_fpath)
+
         # Draw projections and save them to the backup folder
         if umap_every != 0 and step % umap_every == 0:
             print("Drawing and saving projections (step %d)" % step)
@@ -68,25 +79,25 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
             embeds = embeds.detach().cpu().numpy()
             logger.draw_projections(embeds, utterances_per_speaker, step, projection_fpath)
 
-        # Overwrite the latest version of the model
-        if save_every != 0 and step % save_every == 0:
-            print("Saving the model (step %d)" % step)
-            torch.save({
-                "step": step + 1,
-                "model_state": model.state_dict(),
-                "optimizer_state": optimizer.state_dict(),
-            }, state_fpath)
-
-        # Make a backup
-        if backup_every != 0 and step % backup_every == 0:
-            print("Making a backup (step %d)" % step)
-            backup_dir.mkdir(exist_ok=True)
-            backup_fpath = backup_dir.joinpath("%s_bak_%06d.pt" % (run_id, step))
-            torch.save({
-                "step": step + 1,
-                "model_state": model.state_dict(),
-                "optimizer_state": optimizer.state_dict(),
-            }, backup_fpath)
+        # # Overwrite the latest version of the model
+        # if save_every != 0 and step % save_every == 0:
+        #     print("Saving the model (step %d)" % step)
+        #     torch.save({
+        #         "step": step + 1,
+        #         "model_state": model.state_dict(),
+        #         "optimizer_state": optimizer.state_dict(),
+        #     }, state_fpath)
+        #
+        # # Make a backup
+        # if backup_every != 0 and step % backup_every == 0:
+        #     print("Making a backup (step %d)" % step)
+        #     backup_dir.mkdir(exist_ok=True)
+        #     backup_fpath = backup_dir.joinpath("%s_bak_%06d.pt" % (run_id, step))
+        #     torch.save({
+        #         "step": step + 1,
+        #         "model_state": model.state_dict(),
+        #         "optimizer_state": optimizer.state_dict(),
+        #     }, backup_fpath)
 
         profiler.tick("Extras (visualizations, saving)")
 
