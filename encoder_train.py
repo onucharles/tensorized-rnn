@@ -36,6 +36,8 @@ if __name__ == "__main__":
         "Do not load any saved model.")
     parser.add_argument("--no_comet", action="store_true", help= \
         "Disable comet.")
+    parser.add_argument("--gpu_no", type=int, default=0, help =\
+        "The index of GPU to use if multiple are available. If none, CPU will be used.")
     args = parser.parse_args()
     
     # Process the arguments

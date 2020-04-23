@@ -5,13 +5,13 @@ model_embedding_size = 256
 model_num_layers = 3
 
 # Training parameters
-n_epochs = 1000
+n_steps = 1e4
 learning_rate_init = 1e-4
-speakers_per_batch = 32
+speakers_per_batch = 64
 utterances_per_speaker = 10
 
 ## Tensor-train parameters for last linear layer.
-use_tt = True
+use_tt = False
 n_cores = 4
 tt_rank = 3
 

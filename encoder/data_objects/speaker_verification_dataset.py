@@ -6,7 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
 
 class SpeakerVerificationDataset(Dataset):
-    def __init__(self, datasets_root, n_epochs):
+    def __init__(self, datasets_root, dataset_len):
         """
         :param datasets_root:
         :param n_epochs:
@@ -22,10 +22,11 @@ class SpeakerVerificationDataset(Dataset):
         self.speakers = [Speaker(speaker_dir) for speaker_dir in speaker_dirs]
 
         self.speaker_cycler = RandomCycler(self.speakers)
-        self.dataset_len = n_epochs * n_speakers
+        self.dataset_len = dataset_len
+        # self.dataset_len = n_steps * n_speakers
         # self.dataset_len = dataset_len if dataset_len is not None else len(speaker_dirs)
-        print("Train dataset length is: {}, ie no_of_epochs({}) x no_of_speakers({})".
-              format(self.dataset_len, n_epochs, n_speakers))
+        # print("Train dataset length is: {}, ie no_of_epochs({}) x no_of_speakers({})".
+        #       format(self.dataset_len, n_epochs, n_speakers))
 
     def __len__(self):
         return int(self.dataset_len)

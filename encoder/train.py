@@ -14,14 +14,14 @@ from .test import evaluate
 #           umap_every: int, save_every: int, backup_every: int, val_every: int,
 #           force_restart: bool, no_comet: bool):
 def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
-          umap_every: int, val_every: int, force_restart: bool, no_comet: bool):
+        umap_every: int, val_every: int, force_restart: bool, no_comet: bool, gpu_no: int):
     # create comet logger.
     logger = CometLogger(no_comet)
     run_id = logger.get_key()
 
     # setup data and model.
     train_loader, val_loader = create_dataloaders(clean_data_root, clean_data_root_val)
-    device, loss_device = get_devices()
+    device, loss_device = get_devices(gpu_no)
     state_fpath = models_dir.joinpath(run_id + ".pt")
     backup_dir = models_dir.joinpath(run_id + "_backups")
     model, optimizer, init_step = \
@@ -110,19 +110,23 @@ def sync(device: torch.device):
         torch.cuda.synchronize(device)
 
 def create_dataloaders(clean_data_root_train, clean_data_root_val):
-    # Create a dataset and a dataloader
+    # set dataset length to achieve desired no of training steps.
+    train_dataset_len = n_steps * speakers_per_batch
+
+    # Create datasets and dataloaders
     train_loader = SpeakerVerificationDataLoader(
-        SpeakerVerificationDataset(clean_data_root_train, n_epochs),
+        SpeakerVerificationDataset(clean_data_root_train, train_dataset_len),
         speakers_per_batch,
         utterances_per_speaker,
-        num_workers=10,
+        num_workers=12,
+        drop_last=True
     )
 
     val_loader = SpeakerVerificationDataLoader(
         dataset=SpeakerVerificationTestSet(clean_data_root_val),
         speakers_per_batch=test_speakers_per_batch,
         utterances_per_speaker=test_utterances_per_speaker,
-        num_workers=10,
+        num_workers=12,
         drop_last=True
     )
     return train_loader, val_loader
@@ -153,11 +157,12 @@ def setup_model_and_optimizer(device, loss_device, force_restart, state_fpath, r
     return model, optimizer, init_step
 
 
-def get_devices():
+def get_devices(gpu_no):
     # Setup the device on which to run the forward pass and the loss. These can be different,
     # because the forward pass is faster on the GPU whereas the loss is often (depending on your
     # hyperparameters) faster on the CPU.
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    gpu_name = 'cuda:{}'.format(gpu_no)
+    device = torch.device(gpu_name if torch.cuda.is_available() else "cpu")
     # FIXME: currently, the gradient is None if loss_device is cuda
     loss_device = torch.device("cpu")
     return device, loss_device
