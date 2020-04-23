@@ -1,12 +1,12 @@
 from encoder.data_objects import SpeakerVerificationDataLoader, SpeakerVerificationTestSet
 from encoder.params_model import test_speakers_per_batch, test_utterances_per_speaker, test_n_epochs
+from encoder.params_data import partials_n_frames
 from encoder.model import SpeakerEncoder
 from pathlib import Path
 import torch
 
-def evaluate(loader, model, device, loss_device):
+def evaluate(loader, model, speakers_per_batch, utterances_per_speaker, n_epochs, device, loss_device):
     avg_loss, avg_eer = 0, 0
-    n_epochs = test_n_epochs
 
     # Go over entire test set for a few epochs. Important since <test_utterances_per_speaker>,
     # will likely be smaller than the average no of utterances per speaker.
@@ -17,7 +17,7 @@ def evaluate(loader, model, device, loss_device):
                 # print("---------Step {}----------".format(step))
                 inputs = torch.from_numpy(speaker_batch.data).to(device)  # shape: (n_speakers * n_utter, n_frames, n_mels)
                 embeddings = model(inputs)  # shape: (n_speakers * n_utter, d_vector_size)
-                embeddings = embeddings.view((test_speakers_per_batch, test_utterances_per_speaker, -1)).to(
+                embeddings = embeddings.view((speakers_per_batch, utterances_per_speaker, -1)).to(
                     loss_device)  # shape: (n_speakers, n_utter, d_vector_size)
 
                 # split each speakers' utterances into enrollment and verification sets.
@@ -40,9 +40,10 @@ def test(test_data_dir: Path, model_path: Path, n_workers: int):
             .format(test_speakers_per_batch, test_utterances_per_speaker))
     dataset = SpeakerVerificationTestSet(test_data_dir)
     loader = SpeakerVerificationDataLoader(
-        dataset=dataset,
-        speakers_per_batch=test_speakers_per_batch,
-        utterances_per_speaker=test_utterances_per_speaker,
+        dataset,
+        test_speakers_per_batch,
+        test_utterances_per_speaker,
+        partials_n_frames,
         num_workers=n_workers,
         drop_last=True
     )
@@ -64,7 +65,8 @@ def test(test_data_dir: Path, model_path: Path, n_workers: int):
         return
 
     # evaluate the model.
-    avg_loss, avg_eer = evaluate(loader, model, device, loss_device)
+    avg_loss, avg_eer = evaluate(loader, model, test_speakers_per_batch,
+                                 test_utterances_per_speaker, test_n_epochs, device, loss_device)
     print("Average loss: {}\t\tAverage EER: {}".format(avg_loss, avg_eer))
 
 

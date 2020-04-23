@@ -1,5 +1,5 @@
-from encoder.params_model import *
-from encoder.params_data import *
+from encoder.params_model import model_hidden_size, model_num_layers, model_embedding_size
+from encoder.params_data import mel_n_channels
 from scipy.interpolate import interp1d
 from sklearn.metrics import roc_curve
 from torch.nn.utils import clip_grad_norm_

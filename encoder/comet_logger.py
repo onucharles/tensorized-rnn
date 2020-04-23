@@ -1,23 +1,27 @@
 from comet_ml import Experiment
-from encoder.data_objects.speaker_verification_dataset import SpeakerVerificationDataset
 import matplotlib.pyplot as plt
 import numpy as np
 import umap
+import json
+
+from encoder.data_objects.speaker_verification_dataset import SpeakerVerificationDataset
 from .config import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
 
 class CometLogger(Experiment):
-    def __init__(self, disabled):
+    def __init__(self, disabled, ):
+        """
+        Handles logging of experiment to comet and also persistence to local file system.
+        """
         super().__init__(api_key=COMET_API_KEY,
                          workspace=COMET_WORKSPACE,
                          project_name=PROJECT_NAME,
                          disabled=disabled)
         self.disabled = disabled
-        self.log_params()
+        self.parameters = {}
         # log dataset.
         # log device name?? in case of multi gpu setup.
 
-
-    def log_params(self):
+    def log_params(self, params_path):
         """
         Log data and model parameters to comet.
         :return:
@@ -28,11 +32,16 @@ class CometLogger(Experiment):
         from encoder import params_model
         for param_name in (p for p in dir(params_model) if not p.startswith("__")):
             value = getattr(params_model, param_name)
-            self.log_parameter(param_name, value)
+            self.parameters[param_name] = value
 
         for param_name in (p for p in dir(params_data) if not p.startswith("__")):
             value = getattr(params_data, param_name)
-            self.log_parameter(param_name, value)
+            self.parameters[param_name] = value
+        self.log_parameters(self.parameters)
+
+        # save to file.
+        with open(params_path, 'w') as fp:
+            json.dump(self.parameters, fp, sort_keys=True, indent=4)
 
     def log_dataset(self, dataset: SpeakerVerificationDataset):
         if self.disabled:

@@ -1,18 +1,17 @@
 from encoder.data_objects.random_cycler import RandomCycler
 from encoder.data_objects.speaker_batch import SpeakerBatch
 from encoder.data_objects.speaker import Speaker
-from encoder.params_data import partials_n_frames
 from torch.utils.data import Dataset, DataLoader
-from pathlib import Path
+
 
 class SpeakerVerificationDataset(Dataset):
     def __init__(self, datasets_root, dataset_len):
         """
         :param datasets_root:
-        :param n_epochs:
+        :param dataset_len: the number of pseudo-speakers in the dataset. Speakers are sampled
+                            with replacement. Each time a speaker is returned, a random set of
+                            utterances and random segment from each utterance is selected.
         """
-        # :param dataset_len: Can be larger than the number of speakers since speakers will be
-        #         sampled with (constrained) replacement. If None, it is set to the no of speakers.
         self.root = datasets_root
         speaker_dirs = [f for f in self.root.glob("*") if f.is_dir()]
         n_speakers = len(speaker_dirs)
@@ -23,10 +22,6 @@ class SpeakerVerificationDataset(Dataset):
 
         self.speaker_cycler = RandomCycler(self.speakers)
         self.dataset_len = dataset_len
-        # self.dataset_len = n_steps * n_speakers
-        # self.dataset_len = dataset_len if dataset_len is not None else len(speaker_dirs)
-        # print("Train dataset length is: {}, ie no_of_epochs({}) x no_of_speakers({})".
-        #       format(self.dataset_len, n_epochs, n_speakers))
 
     def __len__(self):
         return int(self.dataset_len)
@@ -40,6 +35,7 @@ class SpeakerVerificationDataset(Dataset):
             with log_fpath.open("r") as log_file:
                 log_string += "".join(log_file.readlines())
         return log_string
+
 
 class SpeakerVerificationTestSet(Dataset):
     def __init__(self, datasets_root):
@@ -68,12 +64,14 @@ class SpeakerVerificationTestSet(Dataset):
             with log_fpath.open("r") as log_file:
                 log_string += "".join(log_file.readlines())
         return log_string
-    
+
+
 class SpeakerVerificationDataLoader(DataLoader):
-    def __init__(self, dataset, speakers_per_batch, utterances_per_speaker, sampler=None, 
-                 batch_sampler=None, num_workers=0, pin_memory=False, timeout=0, 
+    def __init__(self, dataset, speakers_per_batch, utterances_per_speaker, partials_n_frames,
+                 sampler=None, batch_sampler=None, num_workers=0, pin_memory=False, timeout=0,
                  worker_init_fn=None, drop_last=False):
         self.utterances_per_speaker = utterances_per_speaker
+        self.partials_n_frames = partials_n_frames
 
         super().__init__(
             dataset=dataset, 
@@ -91,5 +89,4 @@ class SpeakerVerificationDataLoader(DataLoader):
 
     def collate(self, speakers):
         # TODO: if test batch should contain full length utterances.
-        return SpeakerBatch(speakers, self.utterances_per_speaker, partials_n_frames) 
-    
+        return SpeakerBatch(speakers, self.utterances_per_speaker, self.partials_n_frames)
