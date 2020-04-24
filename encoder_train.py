@@ -26,10 +26,12 @@ if __name__ == "__main__":
     parser.add_argument("-u", "--umap_every", type=int, default=100, help= \
         "Number of steps between updates of the umap projection. Set to 0 to never update the "
         "projections.")
-    parser.add_argument("-f", "--force_restart", action="store_true", help= \
-        "Do not load any saved model.")
+    parser.add_argument("-r", "--resume_experiment", action="store_true", help= \
+        "Resume a saved experiment.")
+    parser.add_argument("-k", "--prev_exp_key", type=str, default=None, help= \
+        "The comet key of experiment to resume.")
     parser.add_argument("--no_comet", action="store_true", help= \
-        "Disable comet.")
+        "Disable comet logging.")
     parser.add_argument("--gpu_no", type=int, default=0, help =\
         "The index of GPU to use if multiple are available. If none, CPU will be used.")
     args = parser.parse_args()

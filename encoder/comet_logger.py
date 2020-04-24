@@ -1,4 +1,4 @@
-from comet_ml import Experiment
+from comet_ml import Experiment, ExistingExperiment
 import matplotlib.pyplot as plt
 import numpy as np
 import umap
@@ -7,19 +7,38 @@ import json
 from encoder.data_objects.speaker_verification_dataset import SpeakerVerificationDataset
 from .config import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
 
-class CometLogger(Experiment):
-    def __init__(self, disabled, ):
+class CometLogger():
+    def __init__(self, disabled, is_existing=False, prev_exp_key=None):
         """
         Handles logging of experiment to comet and also persistence to local file system.
+        Supports resumption of stopped experiments.
         """
-        super().__init__(api_key=COMET_API_KEY,
-                         workspace=COMET_WORKSPACE,
-                         project_name=PROJECT_NAME,
-                         disabled=disabled)
+
+        if not is_existing:
+            self.experiment = Experiment(api_key=COMET_API_KEY,
+                                         workspace=COMET_WORKSPACE,
+                                         project_name=PROJECT_NAME,
+                                         disabled=disabled)
+        else:
+            if prev_exp_key is None:
+                raise ValueError("Requested existing experiment, but no key provided")
+            print("Continuing existing experiment with key: ", prev_exp_key)
+            self.experiment = ExistingExperiment(api_key=COMET_API_KEY,
+                                                 workspace=COMET_WORKSPACE,
+                                                 project_name=PROJECT_NAME,
+                                                 disabled=disabled,
+                                                 previous_experiment=prev_exp_key)
         self.disabled = disabled
         self.parameters = {}
         # log dataset.
-        # log device name?? in case of multi gpu setup.
+
+    def get_experiment_key(self):
+        return self.experiment.get_key()[:9]
+
+    def log_metrics(self, metrics, prefix, step):
+        if self.disabled:
+            return
+        self.experiment.log_metrics(metrics, prefix=prefix, step=step)
 
     def log_params(self, params_path):
         """
@@ -37,7 +56,7 @@ class CometLogger(Experiment):
         for param_name in (p for p in dir(params_data) if not p.startswith("__")):
             value = getattr(params_data, param_name)
             self.parameters[param_name] = value
-        self.log_parameters(self.parameters)
+        self.experiment.log_parameters(self.parameters)
 
         # save to file.
         with open(params_path, 'w') as fp:
@@ -82,7 +101,7 @@ class CometLogger(Experiment):
         if out_fpath is not None:
             plt.savefig(out_fpath)
         plt.clf()
-        self.log_image(out_fpath, step=step)
+        self.experiment.log_image(out_fpath, step=step)
 
 colormap = np.array([
     [76, 255, 0],

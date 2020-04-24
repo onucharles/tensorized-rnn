@@ -1,5 +1,5 @@
-from encoder.params_model import model_hidden_size, model_num_layers, model_embedding_size
-from encoder.params_data import mel_n_channels
+# from encoder.params_model import model_hidden_size, model_num_layers, model_embedding_size
+# from encoder.params_data import mel_n_channels
 from scipy.interpolate import interp1d
 from sklearn.metrics import roc_curve
 from torch.nn.utils import clip_grad_norm_
@@ -11,7 +11,8 @@ from t3nsor.layers import TTLinear
 
 
 class SpeakerEncoder(nn.Module):
-    def __init__(self, device, loss_device, use_tt=False, n_cores=3, tt_rank=8):
+    def __init__(self, mel_n_channels, model_hidden_size, model_num_layers,
+                 model_embedding_size, device, loss_device, use_tt=False, n_cores=3, tt_rank=8):
         super().__init__()
         self.loss_device = loss_device
         

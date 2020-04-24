@@ -5,64 +5,55 @@ import torch
 
 from encoder.data_objects import \
     SpeakerVerificationDataLoader, SpeakerVerificationDataset, SpeakerVerificationTestSet
-from encoder.params_model import *
-from encoder.params_data import partials_n_frames
 from encoder.model import SpeakerEncoder
-from utils.profiler import Profiler
 from utils.modelutils import count_model_params
+from utils.ioutils import load_json, save_json
 from .test import evaluate
+from encoder import params_model as pm
+from encoder import params_data as pd
 
 
 def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
-        umap_every: int, val_every: int, force_restart: bool, no_comet: bool, gpu_no: int):
+        umap_every: int, val_every: int, resume_experiment: bool, prev_exp_key: str,
+        no_comet: bool, gpu_no: int):
+
     # create comet logger.
-    logger = CometLogger(no_comet)
-    run_id = logger.get_key()[:9]
+    logger = CometLogger(no_comet, is_existing=resume_experiment, prev_exp_key=prev_exp_key)
+    run_id = logger.get_experiment_key()
+
+    # log or load training parameters.
+    params_fpath, state_fpath, umap_dir = create_paths(models_dir, run_id)
+    log_or_load_parameters(logger, resume_experiment, params_fpath)
 
     # setup dataset and model.
     train_loader, val_loader = create_dataloaders(clean_data_root, clean_data_root_val)
     device, loss_device = get_devices(gpu_no)
-    params_fpath, state_fpath, umap_dir = create_paths(models_dir, run_id)
     model, optimizer, init_step = \
-        create_model_and_optimizer(device, loss_device, force_restart, state_fpath, run_id)
-
-    # log parameters.
-    logger.log_params(params_fpath)
+        create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id)
 
     # Training loop
     best_val_eer = 1.0
-    profiler = Profiler(summarize_every=10, disabled=True)
     for step, speaker_batch in enumerate(train_loader, init_step):
         model.train()
-        profiler.tick("Blocking, waiting for batch (threaded)")
 
         # Forward pass
         inputs = torch.from_numpy(speaker_batch.data).to(device)
-        sync(device)
-        profiler.tick("Data to %s" % device)
         embeds = model(inputs)
-        sync(device)
-        profiler.tick("Forward pass")
-        embeds_loss = embeds.view((speakers_per_batch, utterances_per_speaker, -1)).to(loss_device)
+        embeds_loss = embeds.view((pm.speakers_per_batch, pm.utterances_per_speaker, -1)).to(loss_device)
         loss, eer = model.loss(embeds_loss)
-        sync(loss_device)
-        profiler.tick("Loss")
 
         # Backward pass
         model.zero_grad()
         loss.backward()
-        profiler.tick("Backward pass")
         model.do_gradient_ops()
         optimizer.step()
-        profiler.tick("Parameter update")
 
-        # Update visualizations
         logger.log_metrics({"EER": eer, "loss": loss.item()}, prefix="train", step=step)
-        # print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
+        print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
 
         if val_every != 0 and step % val_every == 0:
-            avg_val_loss, avg_val_eer = evaluate(val_loader, model, test_speakers_per_batch,
-                                test_utterances_per_speaker, test_n_epochs, device, loss_device)
+            avg_val_loss, avg_val_eer = evaluate(val_loader, model, pm.test_speakers_per_batch,
+                                pm.test_utterances_per_speaker, pm.test_n_epochs, device, loss_device)
             logger.log_metrics({"EER": avg_val_eer, "loss": avg_val_loss}, prefix="val", step=step)
             print("Step: {} - Validation Average loss: {}\t\tAverage EER: {}".
                   format(step, avg_val_loss, avg_val_eer))
@@ -80,38 +71,27 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
             print("Drawing and saving projections (step %d)" % step)
             projection_fpath = umap_dir / ("%s_umap_%06d.png" % (run_id, step))
             embeds = embeds.detach().cpu().numpy()
-            logger.draw_projections(embeds, utterances_per_speaker, step, projection_fpath)
-
-        profiler.tick("Extras (visualizations, saving)")
-
-
-def sync(device: torch.device):
-    # FIXME
-    return
-    # For correct profiling (cuda operations are async)
-    if device.type == "cuda":
-        torch.cuda.synchronize(device)
-
+            logger.draw_projections(embeds, pm.utterances_per_speaker, step, projection_fpath)
 
 def create_dataloaders(clean_data_root_train, clean_data_root_val):
     # set dataset length to achieve desired no of training steps.
-    train_dataset_len = n_steps * speakers_per_batch
+    train_dataset_len = pm.n_steps * pm.speakers_per_batch
 
     # Create datasets and dataloaders
     train_loader = SpeakerVerificationDataLoader(
         SpeakerVerificationDataset(clean_data_root_train, train_dataset_len),
-        speakers_per_batch,
-        utterances_per_speaker,
-        partials_n_frames,
+        pm.speakers_per_batch,
+        pm.utterances_per_speaker,
+        pd.partials_n_frames,
         num_workers=12,
         drop_last=True
     )
 
     val_loader = SpeakerVerificationDataLoader(
         SpeakerVerificationTestSet(clean_data_root_val),
-        test_speakers_per_batch,
-        test_utterances_per_speaker,
-        partials_n_frames,
+        pm.test_speakers_per_batch,
+        pm.test_utterances_per_speaker,
+        pd.partials_n_frames,
         num_workers=12,
         drop_last=True
     )
@@ -130,26 +110,30 @@ def create_paths(models_dir, run_id):
     return params_fpath, state_fpath, umap_dir
 
 
-def create_model_and_optimizer(device, loss_device, force_restart, state_fpath, run_id):
-    # Create the model and the optimizer
-    model = SpeakerEncoder(device, loss_device, use_tt=use_tt, n_cores=n_cores, tt_rank=tt_rank)
+def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id):
+    # model
+    model = SpeakerEncoder(pd.mel_n_channels, pm.model_hidden_size, pm.model_num_layers,
+                           pm.model_embedding_size, device, loss_device,
+                           use_tt=pm.use_tt, n_cores=pm.n_cores, tt_rank=pm.tt_rank)
     n_trainable, n_nontrainable = count_model_params(model)
-    print("Model created. Trainable params: {}, Non-trainable params: {}. Total: {}"
+    print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"
           .format(n_trainable, n_nontrainable, n_trainable + n_nontrainable))
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate_init)
+
+    # optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=pm.learning_rate_init)
     init_step = 1
 
     # Load any existing model
-    if not force_restart:
+    if resume_experiment:
         if state_fpath.exists():
-            print("Found existing model \"%s\", loading it and resuming training." % run_id)
+            print("Found existing model \"%s\", loading it and resuming training." % state_fpath)
             checkpoint = torch.load(state_fpath)
             init_step = checkpoint["step"]
             model.load_state_dict(checkpoint["model_state"])
             optimizer.load_state_dict(checkpoint["optimizer_state"])
-            optimizer.param_groups[0]["lr"] = learning_rate_init
+            optimizer.param_groups[0]["lr"] = pm.learning_rate_init
         else:
-            print("No model \"%s\" found, starting training from scratch." % run_id)
+            raise FileNotFoundError("Cannot resume experiment. No model \"%s\" found." % run_id)
     else:
         print("Starting the training from scratch.")
     return model, optimizer, init_step
@@ -164,3 +148,18 @@ def get_devices(gpu_no):
     # FIXME: currently, the gradient is None if loss_device is cuda
     loss_device = torch.device("cpu")
     return device, loss_device
+
+def log_or_load_parameters(logger, resume_experiment, params_fpath):
+    if resume_experiment:
+        if not params_fpath.exists():
+            raise FileNotFoundError("Cannot resume experiment. No parameters file '{}' found"
+                                    .format(params_fpath))
+        params = load_json(params_fpath)
+        for param_name in (p for p in dir(pm) if not p.startswith("__")):
+            setattr(pm, param_name, params[param_name])
+        for param_name in (p for p in dir(pd) if not p.startswith("__")):
+            setattr(pd, param_name, params[param_name])
+        print("Loaded existing parameters from: {}".format(params_fpath))
+    else:
+        logger.log_params(params_fpath)
+        print("Saved parameters to: {}".format(params_fpath))
