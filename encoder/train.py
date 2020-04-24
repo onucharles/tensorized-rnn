@@ -31,6 +31,11 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
     model, optimizer, init_step = \
         create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id)
 
+    if pm.use_tt:
+        logger.add_tag("tt-cores{}-rank{}".format(pm.n_cores, pm.tt_rank))
+    else:
+        logger.add_tag("no-tt")
+
     # Training loop
     best_val_eer = 1.0
     for step, speaker_batch in enumerate(train_loader, init_step):
@@ -65,6 +70,8 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
                     "model_state": model.state_dict(),
                     "optimizer_state": optimizer.state_dict(),
                 }, state_fpath)
+                best_val_eer = avg_val_eer
+                logger.log_metric("best_eer", best_val_eer)
 
         # Draw projections and save them to the backup folder
         if umap_every != 0 and step % umap_every == 0:

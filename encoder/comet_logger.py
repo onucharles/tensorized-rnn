@@ -35,9 +35,10 @@ class CometLogger():
     def get_experiment_key(self):
         return self.experiment.get_key()[:9]
 
+    def add_tag(self, tag):
+        self.experiment.add_tag(tag)
+
     def log_metrics(self, metrics, prefix, step):
-        if self.disabled:
-            return
         self.experiment.log_metrics(metrics, prefix=prefix, step=step)
 
     def log_params(self, params_path):
