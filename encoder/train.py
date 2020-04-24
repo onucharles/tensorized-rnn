@@ -28,6 +28,10 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
 
     # log parameters.
     logger.log_params(params_fpath)
+    if use_tt:
+        logger.add_tag("tt-cores{}-rank{}".format(n_cores, tt_rank))
+    else:
+        logger.add_tag("no-tt")
 
     # Training loop
     best_val_eer = 1.0
@@ -74,6 +78,8 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
                     "model_state": model.state_dict(),
                     "optimizer_state": optimizer.state_dict(),
                 }, state_fpath)
+                best_val_eer = avg_val_eer
+                logger.log_metric("best_eer", best_val_eer)
 
         # Draw projections and save them to the backup folder
         if umap_every != 0 and step % umap_every == 0:
