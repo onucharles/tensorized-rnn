@@ -38,8 +38,11 @@ class CometLogger():
     def add_tag(self, tag):
         self.experiment.add_tag(tag)
 
-    def log_metrics(self, metrics, prefix, step):
-        self.experiment.log_metrics(metrics, prefix=prefix, step=step)
+    def log_metric(self, name, value, step=None):
+        self.experiment.log_metric(name, value, step=step)
+
+    def log_metrics(self, dict, prefix, step):
+        self.experiment.log_metrics(dict, prefix=prefix, step=step)
 
     def log_params(self, params_path):
         """
