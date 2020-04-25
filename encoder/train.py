@@ -28,7 +28,7 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
     # setup dataset and model.
     train_loader, val_loader = create_dataloaders(clean_data_root, clean_data_root_val)
     device, loss_device = get_devices(gpu_no)
-    model, optimizer, init_step = \
+    model, optimizer, init_step, model_val_eer = \
         create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id)
 
     if pm.use_tt:
@@ -37,7 +37,8 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
         logger.add_tag("no-tt")
 
     # Training loop
-    best_val_eer = 1.0
+    best_val_eer = model_val_eer
+    print("Loading first batch for training...")
     for step, speaker_batch in enumerate(train_loader, init_step):
         model.train()
 
@@ -69,6 +70,7 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
                     "step": step + 1,
                     "model_state": model.state_dict(),
                     "optimizer_state": optimizer.state_dict(),
+                    "val_eer": avg_val_eer,
                 }, state_fpath)
                 best_val_eer = avg_val_eer
                 logger.log_metric("best_eer", best_val_eer)
@@ -129,6 +131,7 @@ def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpa
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=pm.learning_rate_init)
     init_step = 1
+    model_val_eer = 1.0
 
     # Load any existing model
     if resume_experiment:
@@ -136,6 +139,7 @@ def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpa
             print("Found existing model \"%s\", loading it and resuming training." % state_fpath)
             checkpoint = torch.load(state_fpath)
             init_step = checkpoint["step"]
+            model_val_eer = checkpoint["val_eer"]
             model.load_state_dict(checkpoint["model_state"])
             optimizer.load_state_dict(checkpoint["optimizer_state"])
             optimizer.param_groups[0]["lr"] = pm.learning_rate_init
@@ -143,7 +147,7 @@ def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpa
             raise FileNotFoundError("Cannot resume experiment. No model \"%s\" found." % run_id)
     else:
         print("Starting the training from scratch.")
-    return model, optimizer, init_step
+    return model, optimizer, init_step, model_val_eer
 
 
 def get_devices(gpu_no):
