@@ -1,7 +1,8 @@
 from encoder.data_objects.random_cycler import RandomCycler
-from encoder.data_objects.speaker_batch import SpeakerBatch
+from encoder.data_objects.speaker_batch import SpeakerBatch, SpeakerTestBatch
 from encoder.data_objects.speaker import Speaker
 from torch.utils.data import Dataset, DataLoader
+from joblib import Parallel, delayed
 
 
 class SpeakerVerificationDataset(Dataset):
@@ -14,8 +15,7 @@ class SpeakerVerificationDataset(Dataset):
         """
         self.root = datasets_root
         speaker_dirs = [f for f in self.root.glob("*") if f.is_dir()]
-        n_speakers = len(speaker_dirs)
-        if n_speakers == 0:
+        if len(speaker_dirs) == 0:
             raise Exception("No speakers found. Make sure you are pointing to the directory "
                             "containing all preprocessed speaker directories.")
         self.speakers = [Speaker(speaker_dir) for speaker_dir in speaker_dirs]
@@ -88,5 +88,28 @@ class SpeakerVerificationDataLoader(DataLoader):
         )
 
     def collate(self, speakers):
-        # TODO: if test batch should contain full length utterances.
         return SpeakerBatch(speakers, self.utterances_per_speaker, self.partials_n_frames)
+
+class SpeakerVerificationTestDataLoader(DataLoader):
+    def __init__(self, dataset, speakers_per_batch, utterances_per_speaker, partials_n_frames,
+                 sampler=None, batch_sampler=None, num_workers=0, pin_memory=False, timeout=0,
+                 worker_init_fn=None, drop_last=False):
+        self.utterances_per_speaker = utterances_per_speaker
+        self.partials_n_frames = partials_n_frames
+
+        super().__init__(
+            dataset=dataset,
+            batch_size=speakers_per_batch,
+            shuffle=False,
+            sampler=sampler,
+            batch_sampler=batch_sampler,
+            num_workers=num_workers,
+            collate_fn=self.collate,
+            pin_memory=pin_memory,
+            drop_last=drop_last,
+            timeout=timeout,
+            worker_init_fn=worker_init_fn,
+        )
+
+    def collate(self, speakers):
+        return SpeakerTestBatch(speakers, self.utterances_per_speaker, self.partials_n_frames)

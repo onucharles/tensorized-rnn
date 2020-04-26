@@ -17,5 +17,5 @@ tt_rank = 3
 
 # Evaluation and Test parameters
 test_speakers_per_batch = 10 #32
-test_utterances_per_speaker = 5 #50
-test_n_epochs = 5
+test_utterances_per_speaker = 10 #50
+# test_n_epochs = 5

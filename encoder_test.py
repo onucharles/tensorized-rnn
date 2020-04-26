@@ -34,25 +34,25 @@ if __name__ == "__main__":
     # this should be set to None (unless you're investigating sth)
     # since we'd like to sample different sets of utterances per speaker
     # in each epoch of testing.
-    set_seed(11)    
+    # set_seed(11)
 
     # Run the test
-    # print_args(args, parser)
-    # test(**vars(args))
+    print_args(args, parser)
+    test(**vars(args))
 
-    # Alternatively, run test on several models.
-    models_dir = Path('/mnt/local/experiments/speech-model-compression/speaker-verification/saved_models/train-clean-100_backups/')
-    model_paths = sorted(models_dir.glob("*.pt"))
-    count = 0
-    result = {}
-    for model_path in model_paths:
-        print("-----Testing model: {}--------".format(count))
-        args.model_path = model_path
-        # print_args(args, parser)
-        avg_loss, avg_eer = test(**vars(args))
-        result[model_path.name] = (avg_loss, avg_eer)
-        count += 1
-
-    print(result)
-    print("ran {} models in total".format(count))
+    # # Alternatively, run test on several models.
+    # models_dir = Path('/mnt/local/experiments/speech-model-compression/speaker-verification/saved_models/train-clean-100_backups/')
+    # model_paths = sorted(models_dir.glob("*.pt"))
+    # count = 0
+    # result = {}
+    # for model_path in model_paths:
+    #     print("-----Testing model: {}--------".format(count))
+    #     args.model_path = model_path
+    #     # print_args(args, parser)
+    #     avg_loss, avg_eer = test(**vars(args))
+    #     result[model_path.name] = (avg_loss, avg_eer)
+    #     count += 1
+    #
+    # print(result)
+    # print("ran {} models in total".format(count))
 

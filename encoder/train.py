@@ -3,8 +3,8 @@ from .comet_logger import CometLogger
 from pathlib import Path
 import torch
 
-from encoder.data_objects import \
-    SpeakerVerificationDataLoader, SpeakerVerificationDataset, SpeakerVerificationTestSet
+from encoder.data_objects import SpeakerVerificationDataLoader, SpeakerVerificationDataset, \
+    SpeakerVerificationTestSet, SpeakerVerificationTestDataLoader
 from encoder.model import SpeakerEncoder
 from utils.modelutils import count_model_params
 from utils.ioutils import load_json, save_json
@@ -57,8 +57,10 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
         print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
 
         if val_every != 0 and step % val_every == 0:
+            # avg_val_loss, avg_val_eer = evaluate(val_loader, model, pm.test_speakers_per_batch,
+            #                     pm.test_utterances_per_speaker, pm.test_n_epochs, device, loss_device)
             avg_val_loss, avg_val_eer = evaluate(val_loader, model, pm.test_speakers_per_batch,
-                                pm.test_utterances_per_speaker, pm.test_n_epochs, device, loss_device)
+                                        pm.test_utterances_per_speaker, device, loss_device)
             logger.log_metrics({"EER": avg_val_eer, "loss": avg_val_loss}, prefix="val", step=step)
             print("Step: {} - Validation Average loss: {}\t\tAverage EER: {}".
                   format(step, avg_val_loss, avg_val_eer))
@@ -80,6 +82,8 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
             embeds = embeds.detach().cpu().numpy()
             logger.draw_projections(embeds, pm.utterances_per_speaker, step, projection_fpath)
 
+        break
+
 def create_dataloaders(clean_data_root_train, clean_data_root_val):
     # set dataset length to achieve desired no of training steps.
     train_dataset_len = pm.n_steps * pm.speakers_per_batch
@@ -94,13 +98,13 @@ def create_dataloaders(clean_data_root_train, clean_data_root_val):
         drop_last=True
     )
 
-    val_loader = SpeakerVerificationDataLoader(
+    val_loader = SpeakerVerificationTestDataLoader(
         SpeakerVerificationTestSet(clean_data_root_val),
         pm.test_speakers_per_batch,
         pm.test_utterances_per_speaker,
         pd.partials_n_frames,
         num_workers=12,
-        drop_last=True
+        drop_last=False
     )
     return train_loader, val_loader
 

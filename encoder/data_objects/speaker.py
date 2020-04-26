@@ -2,7 +2,6 @@ from encoder.data_objects.random_cycler import RandomCycler
 from encoder.data_objects.utterance import Utterance
 from pathlib import Path
 
-# Contains the set of utterances of a single speaker
 class Speaker:
     def __init__(self, root: Path):
         self.root = root
@@ -39,23 +38,20 @@ class Speaker:
 
         return a
 
-    def random_complete(self, count):
+    def get_utterances(self, count=None):
         """
-        Samples a batch of <count> unique COMPLETE utterances from the disk in a way that all
-        utterances come up at least once every two cycles and in a random order every time.
-
-        :param count: The number of partial utterances to sample from the set of utterances from
-        that speaker. Utterances are guaranteed not to be repeated if <count> is not larger than
-        the number of utterances available.
-        :param n_frames: The number of frames in the partial utterance.
-        :return: A list of tuples (utterance, frames) where utterance is an Utterance,
-        frames are the frames of the partial utterance.
+        Return full length utterances: if count is None, return all utterances; if not,
+        return first <count> utterances
+        :param count:
+        :return:
         """
         if self.utterances is None:
             self._load_utterances()
 
-        utterances = self.utterance_cycler.sample(count)
-
-        a = [(u,) + u.get_frames() for u in utterances]
-
-        return a
+        if count is None:
+            return self.utterances
+        else:
+            if len(self.utterances) < count:
+                raise ValueError("Speaker {} has {} utterances, whereas {} was requested."
+                                 .format(self.name, len(self.utterances), count))
+            return self.utterances[: count]

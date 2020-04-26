@@ -89,7 +89,7 @@ class CometLogger():
         )
 
     def draw_projections(self, embeds, utterances_per_speaker, step, out_fpath=None,
-                         max_speakers=10):
+                         max_speakers=16):
         max_speakers = min(max_speakers, len(colormap))
         embeds = embeds[:max_speakers * utterances_per_speaker]
 
