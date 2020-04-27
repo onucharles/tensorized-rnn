@@ -55,7 +55,7 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
         optimizer.step()
 
         logger.log_metrics({"EER": eer, "loss": loss.item()}, prefix="train", step=step)
-        print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
+        # print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
 
         if val_every != 0 and step % val_every == 0:
             # avg_val_loss, avg_val_eer = evaluate(val_loader, model, pm.test_speakers_per_batch,
@@ -66,7 +66,7 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
             print("Step: {} - Validation Average loss: {}\t\tAverage EER: {}".
                   format(step, avg_val_loss, avg_val_eer))
 
-            if avg_val_eer < best_val_eer:  # save current model
+            if  best_val_eer - avg_val_eer > 1e-4:  # save current model if significant improvement
                 print("Saving the model (step %d)" % step)
                 torch.save({
                     "step": step + 1,
@@ -84,7 +84,6 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
             embeds = embeds.detach().cpu().numpy()
             logger.draw_projections(embeds, pm.utterances_per_speaker, step, projection_fpath)
 
-        break
 
 def create_dataloaders(clean_data_root_train, clean_data_root_val):
     # set dataset length to achieve desired no of training steps.
