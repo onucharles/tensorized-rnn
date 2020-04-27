@@ -15,7 +15,9 @@ use_tt = True
 n_cores = 4
 tt_rank = 2
 
+
 # Evaluation and Test parameters
+val_speakers_per_batch = 40
+val_utterances_per_speaker = 32
 test_speakers_per_batch = 40
 test_utterances_per_speaker = 32
-# test_n_epochs = 5

@@ -1,8 +1,7 @@
 from utils.argutils import print_args
-from encoder.train import train
+from encoder.main import train
 from pathlib import Path
 import argparse
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -34,6 +33,7 @@ if __name__ == "__main__":
         "Disable comet logging.")
     parser.add_argument("--gpu_no", type=int, default=0, help =\
         "The index of GPU to use if multiple are available. If none, CPU will be used.")
+    # TODO: set seed for each experiment.
     args = parser.parse_args()
     
     # Process the arguments
@@ -42,4 +42,3 @@ if __name__ == "__main__":
     # Run the training
     print_args(args, parser)
     train(**vars(args))
-    
