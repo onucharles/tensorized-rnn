@@ -15,12 +15,13 @@ from encoder import params_model as pm
 from encoder import params_data as pd
 
 
-def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
+def train(clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
         umap_every: int, val_every: int, resume_experiment: bool, prev_exp_key: str,
-        no_comet: bool, gpu_no: int):
+        no_comet: bool, gpu_no: int, seed: int):
     """
     Main entry point for training.
     """
+    set_seed(seed)
 
     # create comet logger.
     logger = CometLogger(no_comet, is_existing=resume_experiment, prev_exp_key=prev_exp_key)
@@ -265,6 +266,6 @@ def set_seed(seed=None):
         return
     torch.manual_seed(seed)
     np.random.seed(seed)
-    # torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
     random.seed(seed)
     torch.backends.cudnn.deterministic = True

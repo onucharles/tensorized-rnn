@@ -8,11 +8,7 @@ if __name__ == "__main__":
         description="Trains the speaker encoder. You must have run encoder_preprocess.py first.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    
-    parser.add_argument("--run_id", type=str, help= \
-        "Name for this model instance. If a model state from the same run ID was previously "
-        "saved, the training will restart from there. Pass -f to overwrite saved states and "
-        "restart from scratch.")
+
     parser.add_argument("--clean_data_root", type=Path, help= \
         "Path to the output directory of encoder_preprocess.py for training set.")
     parser.add_argument("--clean_data_root_val", type=Path, help= \
@@ -33,7 +29,8 @@ if __name__ == "__main__":
         "Disable comet logging.")
     parser.add_argument("--gpu_no", type=int, default=0, help =\
         "The index of GPU to use if multiple are available. If none, CPU will be used.")
-    # TODO: set seed for each experiment.
+    parser.add_argument("--seed", type=int, default=11, help= \
+        "The random seed to use.")
     args = parser.parse_args()
     
     # Process the arguments
