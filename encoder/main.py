@@ -4,6 +4,7 @@ from pathlib import Path
 import torch
 import numpy as np
 import random
+import warnings
 
 from encoder.data_objects import SpeakerVerificationDataLoader, SpeakerVerificationDataset, \
     SpeakerVerificationTestSet, SpeakerVerificationTestDataLoader
@@ -252,9 +253,15 @@ def log_or_load_parameters(logger, resume_experiment, params_fpath):
                                     .format(params_fpath))
         params = load_json(params_fpath)
         for param_name in (p for p in dir(pm) if not p.startswith("__")):
-            setattr(pm, param_name, params[param_name])
+            if param_name in params:
+                setattr(pm, param_name, params[param_name])
+            else:
+                warnings.warn("Unable to load parameter: '{}'. Not found.".format(param_name))
         for param_name in (p for p in dir(pd) if not p.startswith("__")):
-            setattr(pd, param_name, params[param_name])
+            if param_name in params:
+                setattr(pd, param_name, params[param_name])
+            else:
+                warnings.warn("Unable to load parameter: '{}'. Not found.".format(param_name))
         print("Loaded existing parameters from: {}".format(params_fpath))
     else:
         logger.log_params(params_fpath)
