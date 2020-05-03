@@ -105,7 +105,15 @@ class SpeakerEncoder(nn.Module):
             centroids = centroids.clone() / torch.norm(centroids, dim=2, keepdim=True)
             for j in range(speakers_per_batch):
                 sim_matrix[:, :, j] = (verification_embeds * centroids[j, :, :]).sum(dim=2)
-        
+       
+        # print("similarity weight: {}\t similarity bias: {}\tweight_grad: {}\tbias_grad: {}"
+                # .format(self.similarity_weight.item(), self.similarity_bias.item(),
+                    # self.similarity_weight.grad, self.similarity_bias.grad))
+
+        # print("No of Nans in similarity matrix", torch.sum(sim_matrix != sim_matrix))
+        # print("No of Nans in verification embeds", torch.sum(verification_embeds != verification_embeds))
+        # if enrollment_embeds is not None:
+        #    print("No of Nans in enrollment embeds", torch.sum(enrollment_embeds != enrollment_embeds))
         sim_matrix = sim_matrix * self.similarity_weight + self.similarity_bias
         return sim_matrix
     
