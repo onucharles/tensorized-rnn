@@ -125,6 +125,7 @@ class SpeakerEncoder(nn.Module):
         # print("No of Nans in verification embeds", torch.sum(verification_embeds != verification_embeds))
         # if enrollment_embeds is not None:
         #    print("No of Nans in enrollment embeds", torch.sum(enrollment_embeds != enrollment_embeds))
+
         sim_matrix = sim_matrix * self.similarity_weight + self.similarity_bias
         return sim_matrix
     
@@ -155,7 +156,6 @@ class SpeakerEncoder(nn.Module):
             # Snippet from https://yangcha.github.io/EER-ROC/
             fpr, tpr, thresholds = roc_curve(labels.flatten(), preds.flatten())           
             eer = brentq(lambda x: 1. - x - interp1d(fpr, tpr)(x), 0., 1.)
-            
         return loss, eer
 
 

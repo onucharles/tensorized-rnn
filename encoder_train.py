@@ -8,7 +8,6 @@ if __name__ == "__main__":
         description="Trains the speaker encoder. You must have run encoder_preprocess.py first.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-
     parser.add_argument("--clean_data_root", type=Path, help= \
         "Path to the output directory of encoder_preprocess.py for training set.")
     parser.add_argument("--clean_data_root_val", type=Path, help= \
