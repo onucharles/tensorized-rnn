@@ -2,7 +2,7 @@ from comet_ml import Experiment, ExistingExperiment
 import matplotlib.pyplot as plt
 import numpy as np
 import umap
-import json
+# import json
 
 from encoder.data_objects.speaker_verification_dataset import SpeakerVerificationDataset
 from .config import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
@@ -29,7 +29,7 @@ class CometLogger():
                                                  disabled=disabled,
                                                  previous_experiment=prev_exp_key)
         self.disabled = disabled
-        self.parameters = {}
+        # self.parameters = {}
         # log dataset.
 
     def get_experiment_key(self):
@@ -41,30 +41,33 @@ class CometLogger():
     def log_metric(self, name, value, step=None):
         self.experiment.log_metric(name, value, step=step)
 
-    def log_metrics(self, dict, prefix, step=None):
-        self.experiment.log_metrics(dict, prefix=prefix, step=step)
+    def log_metrics(self, metrics_dict, prefix, step=None):
+        self.experiment.log_metrics(metrics_dict, prefix=prefix, step=step)
 
-    def log_params(self, params_path):
-        """
-        Log data and model parameters to comet.
-        :return:
-        """
-        if self.disabled:
-            return
-        from encoder import params_data
-        from encoder import params_model
-        for param_name in (p for p in dir(params_model) if not p.startswith("__")):
-            value = getattr(params_model, param_name)
-            self.parameters[param_name] = value
+    def log_params(self, params_dict):
+        self.experiment.log_parameters(params_dict)
 
-        for param_name in (p for p in dir(params_data) if not p.startswith("__")):
-            value = getattr(params_data, param_name)
-            self.parameters[param_name] = value
-        self.experiment.log_parameters(self.parameters)
-
-        # save to file.
-        with open(params_path, 'w') as fp:
-            json.dump(self.parameters, fp, sort_keys=True, indent=4)
+    # def log_params(self, params_path):
+    #     """
+    #     Log data and model parameters to comet.
+    #     :return:
+    #     """
+    #     if self.disabled:
+    #         return
+    #     from encoder import params_data
+    #     from encoder import params_model
+    #     for param_name in (p for p in dir(params_model) if not p.startswith("__")):
+    #         value = getattr(params_model, param_name)
+    #         self.parameters[param_name] = value
+    #
+    #     for param_name in (p for p in dir(params_data) if not p.startswith("__")):
+    #         value = getattr(params_data, param_name)
+    #         self.parameters[param_name] = value
+    #     self.experiment.log_parameters(self.parameters)
+    #
+    #     # save to file.
+    #     with open(params_path, 'w') as fp:
+    #         json.dump(self.parameters, fp, sort_keys=True, indent=4)
 
     def log_dataset(self, dataset: SpeakerVerificationDataset):
         if self.disabled:
@@ -90,6 +93,8 @@ class CometLogger():
 
     def draw_projections(self, embeds, utterances_per_speaker, step, out_fpath=None,
                          max_speakers=16):
+        if self.disabled:
+            return
         max_speakers = min(max_speakers, len(colormap))
         embeds = embeds[:max_speakers * utterances_per_speaker]
 

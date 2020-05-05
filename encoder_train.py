@@ -26,7 +26,7 @@ if __name__ == "__main__":
     parser.add_argument("-k", "--prev_exp_key", type=str, default=None, help= \
         "The comet key of experiment to resume.")
     parser.add_argument("--no_comet", action="store_true", help= \
-        "Disable comet logging.")
+        "Disable logging to comet or file system.")
     parser.add_argument("--gpu_no", type=int, default=0, help =\
         "The index of GPU to use if multiple are available. If none, CPU will be used.")
     parser.add_argument("--seed", type=int, default=11, help= \
