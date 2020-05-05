@@ -1,8 +1,8 @@
 
 # Model parameters
-model_hidden_size = 256
+model_hidden_size = 512
 model_embedding_size = 256
-model_num_layers = 3
+model_num_layers = 1
 
 # Training parameters
 n_steps = 2e4
@@ -14,7 +14,6 @@ utterances_per_speaker = 10 #32
 use_tt = True
 n_cores = 8
 tt_rank = 8
-
 
 # Evaluation and Test parameters
 val_speakers_per_batch = 40
