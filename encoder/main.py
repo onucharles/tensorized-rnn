@@ -4,6 +4,8 @@ from pathlib import Path
 import torch
 import numpy as np
 import random
+import warnings
+import json
 
 from encoder.data_objects import SpeakerVerificationDataLoader, SpeakerVerificationDataset, \
     SpeakerVerificationTestSet, SpeakerVerificationTestDataLoader
@@ -15,9 +17,9 @@ from encoder import params_model as pm
 from encoder import params_data as pd
 
 
-def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
+def train(clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
         umap_every: int, val_every: int, resume_experiment: bool, prev_exp_key: str,
-        no_comet: bool, gpu_no: int):
+        no_comet: bool, gpu_no: int, seed: int):
     """
     Main entry point for training.
     """
@@ -28,9 +30,10 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
 
     # log or load training parameters.
     params_fpath, state_fpath, umap_dir = create_paths(models_dir, run_id)
-    log_or_load_parameters(logger, resume_experiment, params_fpath)
+    log_or_load_parameters(logger, resume_experiment, params_fpath, no_comet)
 
     # setup dataset and model.
+    set_seed(seed)
     train_loader = create_train_loader(clean_data_root)
     val_loader = create_test_loader(clean_data_root_val, pm.val_speakers_per_batch,
                                     pm.val_utterances_per_speaker, pd.partials_n_frames)
@@ -71,7 +74,8 @@ def train(run_id: str, clean_data_root: Path, clean_data_root_val: Path, models_
             print("Step: {} - Validation Average loss: {}\t\tAverage EER: {}".
                   format(step, avg_val_loss, avg_val_eer))
 
-            if  best_val_eer - avg_val_eer > 1e-4:  # save current model if significant improvement
+            if no_comet: continue
+            if best_val_eer - avg_val_eer > 1e-4:  # save current model if improvement is significant
                 print("Saving the model (step %d)" % step)
                 torch.save({
                     "step": step + 1,
@@ -191,12 +195,13 @@ def create_test_loader(clean_data_root, speakers_per_batch, utterances_per_speak
     return test_loader
 
 
-def create_paths(models_dir, run_id):
+def create_paths(models_dir, run_id, no_logging=False):
     exp_dir = models_dir / run_id
-    exp_dir.mkdir(exist_ok=True)
-
     umap_dir = exp_dir / "umap_pngs"
-    umap_dir.mkdir(exist_ok=True)
+
+    if not no_logging:
+        exp_dir.mkdir(exist_ok=True)
+        umap_dir.mkdir(exist_ok=True)
 
     params_fpath = exp_dir / "params.txt"
     state_fpath = exp_dir / "model.pt"
@@ -244,19 +249,41 @@ def get_devices(gpu_no):
     loss_device = torch.device("cpu")
     return device, loss_device
 
-def log_or_load_parameters(logger, resume_experiment, params_fpath):
-    if resume_experiment:
+def log_or_load_parameters(logger, resume_experiment, params_fpath, no_logging=False):
+    if resume_experiment:   # load parameters
         if not params_fpath.exists():
             raise FileNotFoundError("Cannot resume experiment. No parameters file '{}' found"
                                     .format(params_fpath))
         params = load_json(params_fpath)
         for param_name in (p for p in dir(pm) if not p.startswith("__")):
-            setattr(pm, param_name, params[param_name])
+            if param_name in params:
+                setattr(pm, param_name, params[param_name])
+            else:
+                warnings.warn("Unable to load parameter: '{}'. Not found.".format(param_name))
         for param_name in (p for p in dir(pd) if not p.startswith("__")):
-            setattr(pd, param_name, params[param_name])
+            if param_name in params:
+                setattr(pd, param_name, params[param_name])
+            else:
+                warnings.warn("Unable to load parameter: '{}'. Not found.".format(param_name))
         print("Loaded existing parameters from: {}".format(params_fpath))
-    else:
-        logger.log_params(params_fpath)
+    else:   # log parameters
+        # logger.log_params(params_fpath)
+        if no_logging:
+            return
+
+        parameters = {}
+        for param_name in (p for p in dir(pm) if not p.startswith("__")):
+            value = getattr(pm, param_name)
+            parameters[param_name] = value
+
+        for param_name in (p for p in dir(pd) if not p.startswith("__")):
+            value = getattr(pd, param_name)
+            parameters[param_name] = value
+
+        # log to comet and save to file.
+        logger.log_params(parameters)
+        with open(params_fpath, 'w') as fp:
+            json.dump(parameters, fp, sort_keys=True, indent=4)
         print("Saved parameters to: {}".format(params_fpath))
 
 
@@ -265,6 +292,6 @@ def set_seed(seed=None):
         return
     torch.manual_seed(seed)
     np.random.seed(seed)
-    # torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
     random.seed(seed)
     torch.backends.cudnn.deterministic = True

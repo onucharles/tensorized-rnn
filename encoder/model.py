@@ -8,12 +8,18 @@ from torch import nn
 import numpy as np
 import torch
 from t3nsor.layers import TTLinear
+from utils.modelutils import count_model_params
 
 
 class SpeakerEncoder(nn.Module):
     def __init__(self, mel_n_channels, model_hidden_size, model_num_layers,
-                 model_embedding_size, device, loss_device, use_tt=False, n_cores=3, tt_rank=8):
+                 model_embedding_size, device, loss_device, use_tt=False, n_cores=3, tt_rank=8,
+                 use_low_rank=False):
         super().__init__()
+
+        if use_tt and use_low_rank:
+            raise ValueError("use_tt and use_low_rank cannot both be True.")
+
         self.loss_device = loss_device
         
         # Network definition
@@ -22,12 +28,17 @@ class SpeakerEncoder(nn.Module):
                             num_layers=model_num_layers, 
                             batch_first=True).to(device)
         if not use_tt:
-            self.linear = nn.Linear(in_features=model_hidden_size,
-                                out_features=model_embedding_size).to(device)
+            if not use_low_rank:
+                self.linear = nn.Linear(in_features=model_hidden_size,
+                                    out_features=model_embedding_size).to(device)
+            else:
+                # implement low-rank
+                raise NotImplementedError()
         else:
+            print("Encoding linear layer as a tensor-train...")
             self.linear = TTLinear(in_features=model_hidden_size, out_features=model_embedding_size,
                                    bias=True, auto_shapes=True, d=n_cores, tt_rank=tt_rank).to(device)
-            print("Encoding linear layer as a tensor-train...")
+        print("Number of parameters in last layer: ", count_model_params(self.linear))
 
         self.relu = torch.nn.ReLU().to(device)
         
@@ -105,7 +116,16 @@ class SpeakerEncoder(nn.Module):
             centroids = centroids.clone() / torch.norm(centroids, dim=2, keepdim=True)
             for j in range(speakers_per_batch):
                 sim_matrix[:, :, j] = (verification_embeds * centroids[j, :, :]).sum(dim=2)
-        
+       
+        # print("similarity weight: {}\t similarity bias: {}\tweight_grad: {}\tbias_grad: {}"
+                # .format(self.similarity_weight.item(), self.similarity_bias.item(),
+                    # self.similarity_weight.grad, self.similarity_bias.grad))
+
+        # print("No of Nans in similarity matrix", torch.sum(sim_matrix != sim_matrix))
+        # print("No of Nans in verification embeds", torch.sum(verification_embeds != verification_embeds))
+        # if enrollment_embeds is not None:
+        #    print("No of Nans in enrollment embeds", torch.sum(enrollment_embeds != enrollment_embeds))
+
         sim_matrix = sim_matrix * self.similarity_weight + self.similarity_bias
         return sim_matrix
     
@@ -136,5 +156,20 @@ class SpeakerEncoder(nn.Module):
             # Snippet from https://yangcha.github.io/EER-ROC/
             fpr, tpr, thresholds = roc_curve(labels.flatten(), preds.flatten())           
             eer = brentq(lambda x: 1. - x - interp1d(fpr, tpr)(x), 0., 1.)
-            
         return loss, eer
+
+
+class LRLinear(nn.Module):
+    """
+    Low-rank factorised linear module.
+    """
+    def __init__(self, in_features, out_features, rank, device, bias=True):
+        super(LRLinear, self).__init__()
+
+        self.linear1 = nn.Linear(in_features=in_features,
+                                    out_features=rank, bias=bias).to(device)
+        self.linear2 = nn.Linear(in_features=rank,
+                                 out_features=out_features, bias=bias).to(device)
+
+    def forward(self, x):
+        return self.linear2(self.linear1(x))
