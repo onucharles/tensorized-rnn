@@ -13,8 +13,8 @@ from utils.modelutils import count_model_params
 
 class SpeakerEncoder(nn.Module):
     def __init__(self, mel_n_channels, model_hidden_size, model_num_layers,
-                 model_embedding_size, device, loss_device, use_tt=False, n_cores=3, tt_rank=8,
-                 use_low_rank=False):
+                 model_embedding_size, device, loss_device, use_tt=False, use_low_rank=False,
+                 n_cores=3, tt_rank=8):
         super().__init__()
 
         if use_tt and use_low_rank:
@@ -32,8 +32,9 @@ class SpeakerEncoder(nn.Module):
                 self.linear = nn.Linear(in_features=model_hidden_size,
                                     out_features=model_embedding_size).to(device)
             else:
-                # implement low-rank
-                raise NotImplementedError()
+                print("Encoding linear layer via low-rank matrix factorisation...")
+                self.linear = LRLinear(in_features=model_hidden_size,
+                                   out_features=model_embedding_size, rank=tt_rank).to(device)
         else:
             print("Encoding linear layer as a tensor-train...")
             self.linear = TTLinear(in_features=model_hidden_size, out_features=model_embedding_size,
@@ -163,13 +164,13 @@ class LRLinear(nn.Module):
     """
     Low-rank factorised linear module.
     """
-    def __init__(self, in_features, out_features, rank, device, bias=True):
+    def __init__(self, in_features, out_features, rank, bias=True):
         super(LRLinear, self).__init__()
 
         self.linear1 = nn.Linear(in_features=in_features,
-                                    out_features=rank, bias=bias).to(device)
+                                    out_features=rank, bias=bias)
         self.linear2 = nn.Linear(in_features=rank,
-                                 out_features=out_features, bias=bias).to(device)
+                                 out_features=out_features, bias=bias)
 
     def forward(self, x):
         return self.linear2(self.linear1(x))

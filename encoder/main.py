@@ -65,7 +65,7 @@ def train(clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
         optimizer.step()
 
         logger.log_metrics({"EER": eer, "loss": loss.item()}, prefix="train", step=step)
-        # print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
+        print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
 
         if val_every != 0 and step % val_every == 0:
             avg_val_loss, avg_val_eer = evaluate(val_loader, model, pm.val_speakers_per_batch,
@@ -115,7 +115,7 @@ def test(test_data_dir: Path, exp_root_dir: Path, prev_exp_key: str,
     log_or_load_parameters(logger, resume_experiment=True, params_fpath=params_fpath)
     device, loss_device = get_devices(gpu_no)
     model = SpeakerEncoder(pd.mel_n_channels, pm.model_hidden_size, pm.model_num_layers,
-                           pm.model_embedding_size, device, loss_device,
+                           pm.model_embedding_size, device, loss_device, use_low_rank=pm.use_low_rank,
                            use_tt=pm.use_tt, n_cores=pm.n_cores, tt_rank=pm.tt_rank)
     if state_fpath.exists():
         print("Found existing model \"%s\", loading it." % state_fpath)
@@ -211,7 +211,7 @@ def create_paths(models_dir, run_id, no_logging=False):
 def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id):
     # model
     model = SpeakerEncoder(pd.mel_n_channels, pm.model_hidden_size, pm.model_num_layers,
-                           pm.model_embedding_size, device, loss_device,
+                           pm.model_embedding_size, device, loss_device, use_low_rank=pm.use_low_rank,
                            use_tt=pm.use_tt, n_cores=pm.n_cores, tt_rank=pm.tt_rank)
     n_trainable, n_nontrainable = count_model_params(model)
     print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"
