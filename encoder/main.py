@@ -43,6 +43,8 @@ def train(clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
 
     if pm.use_tt:
         logger.add_tag("tt-cores{}-rank{}".format(pm.n_cores, pm.tt_rank))
+    elif pm.use_low_rank:
+        logger.add_tag("low-rank{}".format(pm.tt_rank))
     else:
         logger.add_tag("no-tt")
 
@@ -65,7 +67,7 @@ def train(clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
         optimizer.step()
 
         logger.log_metrics({"EER": eer, "loss": loss.item()}, prefix="train", step=step)
-        print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
+        # print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
 
         if val_every != 0 and step % val_every == 0:
             avg_val_loss, avg_val_eer = evaluate(val_loader, model, pm.val_speakers_per_batch,
