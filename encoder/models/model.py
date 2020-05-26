@@ -10,6 +10,8 @@ import torch
 from t3nsor.layers import TTLinear
 from utils.modelutils import count_model_params
 
+from .tt_lstm import TT_LSTM
+
 
 class SpeakerEncoder(nn.Module):
     def __init__(self, mel_n_channels, model_hidden_size, model_num_layers,
@@ -23,10 +25,12 @@ class SpeakerEncoder(nn.Module):
         self.loss_device = loss_device
         
         # Network definition
-        self.lstm = nn.LSTM(input_size=mel_n_channels,
-                            hidden_size=model_hidden_size, 
-                            num_layers=model_num_layers, 
-                            batch_first=True).to(device)
+        # self.lstm = nn.LSTM(input_size=mel_n_channels,
+        #                     hidden_size=model_hidden_size,
+        #                     num_layers=model_num_layers,
+        #                     batch_first=True).to(device)
+        self.lstm = TT_LSTM(mel_n_channels, model_hidden_size, model_num_layers, device)
+
         if not use_tt:
             if not use_low_rank:
                 self.linear = nn.Linear(in_features=model_hidden_size,
@@ -68,12 +72,14 @@ class SpeakerEncoder(nn.Module):
         batch_size, hidden_size). Will default to a tensor of zeros if None.
         :return: the embeddings as a tensor of shape (batch_size, embedding_size)
         """
-        # Pass the input through the LSTM layers and retrieve all outputs, the final hidden state
-        # and the final cell state.
-        out, (hidden, cell) = self.lstm(utterances, hidden_init)
-        
-        # We take only the hidden state of the last layer
-        embeds_raw = self.relu(self.linear(hidden[-1]))
+        # # Pass the input through the LSTM layers and retrieve all outputs, the final hidden state
+        # # and the final cell state.
+        # out, (hidden, cell) = self.lstm(utterances, hidden_init)
+        #
+        # # We take only the hidden state of the last layer
+        # embeds_raw = self.relu(self.linear(hidden[-1]))
+        out, (last_hidden, last_cell) = self.lstm(utterances)
+        embeds_raw = self.relu(self.linear(last_hidden))
         
         # L2-normalize it
         embeds = embeds_raw / torch.norm(embeds_raw, dim=1, keepdim=True)

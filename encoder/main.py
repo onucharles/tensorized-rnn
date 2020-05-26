@@ -6,12 +6,13 @@ import numpy as np
 import random
 import warnings
 import json
+from torchsummary import summary
 
 from encoder.data_objects import SpeakerVerificationDataLoader, SpeakerVerificationDataset, \
     SpeakerVerificationTestSet, SpeakerVerificationTestDataLoader
-from encoder.model import SpeakerEncoder
+from encoder.models.model import SpeakerEncoder
 from utils.modelutils import count_model_params
-from utils.ioutils import load_json, save_json
+from utils.ioutils import load_json
 # from .test import evaluate
 from encoder import params_model as pm
 from encoder import params_data as pd
@@ -67,7 +68,7 @@ def train(clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
         optimizer.step()
 
         logger.log_metrics({"EER": eer, "loss": loss.item()}, prefix="train", step=step)
-        # print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
+        print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
 
         if val_every != 0 and step % val_every == 0:
             avg_val_loss, avg_val_eer = evaluate(val_loader, model, pm.val_speakers_per_batch,
@@ -215,6 +216,7 @@ def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpa
     model = SpeakerEncoder(pd.mel_n_channels, pm.model_hidden_size, pm.model_num_layers,
                            pm.model_embedding_size, device, loss_device, use_low_rank=pm.use_low_rank,
                            use_tt=pm.use_tt, n_cores=pm.n_cores, tt_rank=pm.tt_rank)
+    # summary(model, (pd.partials_n_frames, pd.mel_n_channels))
     n_trainable, n_nontrainable = count_model_params(model)
     print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"
           .format(n_trainable, n_nontrainable, n_trainable + n_nontrainable))
