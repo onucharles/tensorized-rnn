@@ -7,6 +7,7 @@ class TT_LSTMCell(nn.Module):
         super(TT_LSTMCell, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
+        self.bias = bias
         self.device = device
         # self.weight_ih = Parameter(torch.randn(4 * hidden_size, input_size))
         # self.weight_hh = Parameter(torch.randn(4 * hidden_size, hidden_size))
@@ -14,6 +15,12 @@ class TT_LSTMCell(nn.Module):
         # self.bias_hh = Parameter(torch.randn(4 * hidden_size))
         self.input_weights = nn.Linear(input_size, 4 * hidden_size, bias).to(device)
         self.hidden_weights = nn.Linear(hidden_size, 4 * hidden_size, bias).to(device)
+        self.init_weight_and_bias()
+
+    def init_weight_and_bias(self):
+        sqrt_k = (1.0 / self.hidden_size) ** .5
+        nn.init.uniform_(self.input_weights.weight, -sqrt_k, sqrt_k)
+        nn.init.uniform_(self.input_weights.bias, -sqrt_k, sqrt_k)
 
     def init_hidden(self, batch_size, hidden_size):
         h = torch.zeros(batch_size, hidden_size).to(self.device)
@@ -57,7 +64,7 @@ class TT_LSTM(nn.Module):
             self._all_layers.append(cell)
 
     def forward(self, input):
-        # input is (batch_size, n_steps, input_size)
+        # input: (batch_size, n_steps, input_size)
 
         batch_size, n_steps, input_size = input.size()
         internal_state = []
