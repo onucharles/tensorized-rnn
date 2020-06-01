@@ -1,5 +1,5 @@
 from encoder.params_data import *
-from encoder.models.model import SpeakerEncoder
+from encoder.models.speaker_encoder import SpeakerEncoder
 from matplotlib import cm
 from encoder import audio
 from pathlib import Path

@@ -1,5 +1,3 @@
-# from encoder.params_model import model_hidden_size, model_num_layers, model_embedding_size
-# from encoder.params_data import mel_n_channels
 from scipy.interpolate import interp1d
 from sklearn.metrics import roc_curve
 from torch.nn.utils import clip_grad_norm_
@@ -7,20 +5,19 @@ from scipy.optimize import brentq
 from torch import nn
 import numpy as np
 import torch
+
 from t3nsor.layers import TTLinear
 from utils.modelutils import count_model_params
-
-from .tt_lstm import TT_LSTM
+from .lstm import LSTM
+from .tt_lstm import TTLSTM
+from .lr_linear import LRLinear
 
 
 class SpeakerEncoder(nn.Module):
     def __init__(self, mel_n_channels, model_hidden_size, model_num_layers,
-                 model_embedding_size, device, loss_device, use_tt=False, use_low_rank=False,
-                 n_cores=3, tt_rank=8):
+                 model_embedding_size, device, loss_device, compression=None,
+                 n_cores=3, rank=8):
         super().__init__()
-
-        if use_tt and use_low_rank:
-            raise ValueError("use_tt and use_low_rank cannot both be True.")
 
         self.loss_device = loss_device
         
@@ -29,20 +26,24 @@ class SpeakerEncoder(nn.Module):
         #                     hidden_size=model_hidden_size,
         #                     num_layers=model_num_layers,
         #                     batch_first=True).to(device)
-        self.lstm = TT_LSTM(mel_n_channels, model_hidden_size, model_num_layers, device)
 
-        if not use_tt:
-            if not use_low_rank:
-                self.linear = nn.Linear(in_features=model_hidden_size,
-                                    out_features=model_embedding_size).to(device)
-            else:
-                print("Encoding linear layer via low-rank matrix factorisation...")
-                self.linear = LRLinear(in_features=model_hidden_size,
-                                   out_features=model_embedding_size, rank=tt_rank).to(device)
-        else:
+        if compression is None:
+            self.lstm = LSTM(mel_n_channels, model_hidden_size, model_num_layers, device)
+            self.linear = nn.Linear(in_features=model_hidden_size,
+                                 out_features=model_embedding_size).to(device)
+        elif compression == 'lr':
+            print("Encoding linear layer via low-rank matrix factorisation...")
+            self.linear = LRLinear(in_features=model_hidden_size,
+                                   out_features=model_embedding_size, rank=rank).to(device)
+            raise ValueError("Low rank LSTM not implemented.")
+        elif compression == 'tt':
             print("Encoding linear layer as a tensor-train...")
+            self.lstm = TTLSTM(mel_n_channels, model_hidden_size, model_num_layers, device,
+                               n_cores, rank)
             self.linear = TTLinear(in_features=model_hidden_size, out_features=model_embedding_size,
-                                   bias=True, auto_shapes=True, d=n_cores, tt_rank=tt_rank).to(device)
+                                   bias=True, auto_shapes=True, d=n_cores, tt_rank=rank).to(device)
+        else:
+            raise ValueError("Unknown compression type: '{}'".format(compression))
         print("Number of parameters in last layer: ", count_model_params(self.linear))
 
         self.relu = torch.nn.ReLU().to(device)
@@ -166,17 +167,4 @@ class SpeakerEncoder(nn.Module):
         return loss, eer
 
 
-class LRLinear(nn.Module):
-    """
-    Low-rank factorised linear module.
-    """
-    def __init__(self, in_features, out_features, rank, bias=True):
-        super(LRLinear, self).__init__()
 
-        self.linear1 = nn.Linear(in_features=in_features,
-                                    out_features=rank, bias=bias)
-        self.linear2 = nn.Linear(in_features=rank,
-                                 out_features=out_features, bias=bias)
-
-    def forward(self, x):
-        return self.linear2(self.linear1(x))

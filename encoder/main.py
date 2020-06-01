@@ -10,10 +10,9 @@ from torchsummary import summary
 
 from encoder.data_objects import SpeakerVerificationDataLoader, SpeakerVerificationDataset, \
     SpeakerVerificationTestSet, SpeakerVerificationTestDataLoader
-from encoder.models.model import SpeakerEncoder
+from encoder.models.speaker_encoder import SpeakerEncoder
 from utils.modelutils import count_model_params
 from utils.ioutils import load_json
-# from .test import evaluate
 from encoder import params_model as pm
 from encoder import params_data as pd
 
@@ -42,12 +41,14 @@ def train(clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
     model, optimizer, init_step, model_val_eer = \
         create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id)
 
-    if pm.use_tt:
-        logger.add_tag("tt-cores{}-rank{}".format(pm.n_cores, pm.tt_rank))
-    elif pm.use_low_rank:
-        logger.add_tag("low-rank{}".format(pm.tt_rank))
+    if pm.compression == 'tt':
+        logger.add_tag("tt-cores{}-rank{}".format(pm.n_cores, pm.rank))
+    elif pm.compression == 'lr':
+        logger.add_tag("low-rank{}".format(pm.rank))
+    elif pm.compression is None:
+        logger.add_tag("no-comp")
     else:
-        logger.add_tag("no-tt")
+        raise ValueError('Unknown compression value: "{}"'.format(pm.compression))
 
     # Training loop
     best_val_eer = model_val_eer
@@ -119,7 +120,7 @@ def test(test_data_dir: Path, exp_root_dir: Path, prev_exp_key: str,
     device, loss_device = get_devices(gpu_no)
     model = SpeakerEncoder(pd.mel_n_channels, pm.model_hidden_size, pm.model_num_layers,
                            pm.model_embedding_size, device, loss_device, use_low_rank=pm.use_low_rank,
-                           use_tt=pm.use_tt, n_cores=pm.n_cores, tt_rank=pm.tt_rank)
+                           use_tt=pm.use_tt, n_cores=pm.n_cores, rank=pm.rank)
     if state_fpath.exists():
         print("Found existing model \"%s\", loading it." % state_fpath)
         checkpoint = torch.load(state_fpath)
@@ -214,8 +215,9 @@ def create_paths(models_dir, run_id, no_logging=False):
 def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id):
     # model
     model = SpeakerEncoder(pd.mel_n_channels, pm.model_hidden_size, pm.model_num_layers,
-                           pm.model_embedding_size, device, loss_device, use_low_rank=pm.use_low_rank,
-                           use_tt=pm.use_tt, n_cores=pm.n_cores, tt_rank=pm.tt_rank)
+                           pm.model_embedding_size, device, loss_device,
+                           compression=pm.compression, n_cores=pm.n_cores,
+                           rank=pm.rank)
     # summary(model, (pd.partials_n_frames, pd.mel_n_channels))
     n_trainable, n_nontrainable = count_model_params(model)
     print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"

@@ -7,14 +7,13 @@ model_num_layers = 3
 # Training parameters
 n_steps = 2e4
 learning_rate_init = 1e-3
-speakers_per_batch = 64
-utterances_per_speaker = 32
+speakers_per_batch = 10
+utterances_per_speaker = 10
 
 ## Tensor-train parameters for last linear layer.
-use_tt = True
-use_low_rank = False
+compression = None
 n_cores = 4
-tt_rank = 2
+rank = 2
 
 # Evaluation and Test parameters
 val_speakers_per_batch = 40
