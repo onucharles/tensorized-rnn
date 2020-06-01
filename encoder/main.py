@@ -38,6 +38,7 @@ def train(clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
     val_loader = create_test_loader(clean_data_root_val, pm.val_speakers_per_batch,
                                     pm.val_utterances_per_speaker, pd.partials_n_frames)
     device, loss_device = get_devices(gpu_no)
+    device = torch.device('cpu')
     model, optimizer, init_step, model_val_eer = \
         create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id)
 

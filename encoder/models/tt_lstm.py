@@ -1,3 +1,4 @@
+from torch import nn
 from .lstm import LSTMCell, LSTM
 from t3nsor.layers import TTLinear
 
@@ -12,6 +13,8 @@ class TTLSTMCell(LSTMCell):
                             bias=bias, auto_shapes=True, d=n_cores, tt_rank=tt_rank).to(device)
         self.hidden_weights = TTLinear(in_features=hidden_size, out_features=4 * hidden_size,
                             bias=bias, auto_shapes=True, d=n_cores, tt_rank=tt_rank).to(device)
+        #self.input_weights = nn.Linear(input_size, 4 * hidden_size, bias).to(device)
+        #self.hidden_weights = nn.Linear(hidden_size, 4 * hidden_size, bias).to(device)
 
 
 class TTLSTM(LSTM):
@@ -27,10 +30,10 @@ class TTLSTM(LSTM):
         for i in range(self.num_layers):
             name = 'cell{}'.format(i)
             if i == 0:
-                cell = LSTMCell(self.input_size, self.hidden_size, self.bias, device,
+                cell = TTLSTMCell(self.input_size, self.hidden_size, self.bias, device,
                                 n_cores=n_cores, tt_rank=tt_rank)
             else:
-                cell = LSTMCell(self.hidden_size, self.hidden_size, self.bias, device,
+                cell = TTLSTMCell(self.hidden_size, self.hidden_size, self.bias, device,
                                 n_cores=n_cores, tt_rank=tt_rank)
             setattr(self, name, cell)
             self._all_layers.append(cell)

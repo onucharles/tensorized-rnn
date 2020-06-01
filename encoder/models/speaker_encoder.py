@@ -39,7 +39,7 @@ class SpeakerEncoder(nn.Module):
         elif compression == 'tt':
             print("Encoding linear layer as a tensor-train...")
             self.lstm = TTLSTM(mel_n_channels, model_hidden_size, model_num_layers, device,
-                               n_cores, rank)
+                               bias=True, n_cores=n_cores, tt_rank=rank)
             self.linear = TTLinear(in_features=model_hidden_size, out_features=model_embedding_size,
                                    bias=True, auto_shapes=True, d=n_cores, tt_rank=rank).to(device)
         else:
