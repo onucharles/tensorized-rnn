@@ -9,18 +9,8 @@ class TT_LSTMCell(nn.Module):
         self.hidden_size = hidden_size
         self.bias = bias
         self.device = device
-        # self.weight_ih = Parameter(torch.randn(4 * hidden_size, input_size))
-        # self.weight_hh = Parameter(torch.randn(4 * hidden_size, hidden_size))
-        # self.bias_ih = Parameter(torch.randn(4 * hidden_size))
-        # self.bias_hh = Parameter(torch.randn(4 * hidden_size))
         self.input_weights = nn.Linear(input_size, 4 * hidden_size, bias).to(device)
         self.hidden_weights = nn.Linear(hidden_size, 4 * hidden_size, bias).to(device)
-        self.init_weight_and_bias()
-
-    def init_weight_and_bias(self):
-        sqrt_k = (1.0 / self.hidden_size) ** .5
-        nn.init.uniform_(self.input_weights.weight, -sqrt_k, sqrt_k)
-        nn.init.uniform_(self.input_weights.bias, -sqrt_k, sqrt_k)
 
     def init_hidden(self, batch_size, hidden_size):
         h = torch.zeros(batch_size, hidden_size).to(self.device)
@@ -28,8 +18,6 @@ class TT_LSTMCell(nn.Module):
         return h, c
 
     def forward(self, input, hx, cx):
-        # gates = (torch.mm(input, self.weight_ih.t()) + self.bias_ih +
-        #          torch.mm(hx, self.weight_hh.t()) + self.bias_hh)
         gates = self.input_weights(input) + self.hidden_weights(hx)
         ingate, forgetgate, cellgate, outgate = gates.chunk(4, 1)
 

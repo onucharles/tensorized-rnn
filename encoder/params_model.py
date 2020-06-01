@@ -13,8 +13,8 @@ utterances_per_speaker = 32
 ## Tensor-train parameters for last linear layer.
 use_tt = True
 use_low_rank = False
-n_cores = 8
-tt_rank = 1
+n_cores = 4
+tt_rank = 2
 
 # Evaluation and Test parameters
 val_speakers_per_batch = 40
