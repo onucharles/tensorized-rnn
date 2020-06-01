@@ -61,8 +61,9 @@ class TT_LSTM(nn.Module):
         for step in range(n_steps):
             x = input[:, step, :]
             for i in range(self.num_layers):
-                name = 'cell{}'.format(i)
-                lstm_cell = getattr(self, name)
+                #name = 'cell{}'.format(i)
+                #lstm_cell = getattr(self, name)
+                lstm_cell = self._all_layers[i]
 
                 # initialise each cell at first step.
                 if step == 0:
