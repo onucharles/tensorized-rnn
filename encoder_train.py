@@ -9,10 +9,10 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("--clean_data_root", type=Path, help= \
-        "Path to the output directory of encoder_preprocess.py for training set.")
-    parser.add_argument("--clean_data_root_val", type=Path, help= \
-        "Path to the output directory of encoder_preprocess.py for validation set.")
-    parser.add_argument("-m", "--models_dir", type=Path, default="encoder/saved_models/", help=\
+        "Path to the output directory of encoder_preprocess.py for training and validation sets.")
+    # parser.add_argument("--clean_data_root_val", type=Path, help= \
+    #     "Path to the output directory of encoder_preprocess.py for validation set.")
+    parser.add_argument("-m", "--models_dir", type=Path, help=\
         "Path to the output directory that will contain the saved model weights, as well as "
         "backups of those weights and plots generated during training.")
     parser.add_argument("-v", "--val_every", type=int, default=50, help= \

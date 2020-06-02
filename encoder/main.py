@@ -15,11 +15,12 @@ from utils.modelutils import count_model_params
 from utils.ioutils import load_json
 from encoder import params_model as pm
 from encoder import params_data as pd
+from encoder import config
 
 
-def train(clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
-        umap_every: int, val_every: int, resume_experiment: bool, prev_exp_key: str,
-        no_comet: bool, gpu_no: int, seed: int):
+def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: int,
+          resume_experiment: bool, prev_exp_key: str, no_comet: bool, gpu_no: int,
+          seed: int):
     """
     Main entry point for training.
     """
@@ -29,13 +30,14 @@ def train(clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
     run_id = logger.get_experiment_key()
 
     # log or load training parameters.
-    params_fpath, state_fpath, umap_dir = create_paths(models_dir, run_id)
+    train_data_dir, val_data_dir, params_fpath, state_fpath, umap_dir = \
+        create_paths(clean_data_root, models_dir, run_id)
     log_or_load_parameters(logger, resume_experiment, params_fpath, no_comet)
 
     # setup dataset and model.
     set_seed(seed)
-    train_loader = create_train_loader(clean_data_root)
-    val_loader = create_test_loader(clean_data_root_val, pm.val_speakers_per_batch,
+    train_loader = create_train_loader(train_data_dir)
+    val_loader = create_test_loader(val_data_dir, pm.val_speakers_per_batch,
                                     pm.val_utterances_per_speaker, pd.partials_n_frames)
     device, loss_device = get_devices(gpu_no)
     device = torch.device('cpu')
@@ -200,7 +202,9 @@ def create_test_loader(clean_data_root, speakers_per_batch, utterances_per_speak
     return test_loader
 
 
-def create_paths(models_dir, run_id, no_logging=False):
+def create_paths(data_dir, models_dir, run_id, no_logging=False):
+    train_data_dir = data_dir / config.TRAIN_DATA_FOLDER
+    val_data_dir = data_dir / config.VAL_DATA_FOLDER
     exp_dir = models_dir / run_id
     umap_dir = exp_dir / "umap_pngs"
 
@@ -210,7 +214,7 @@ def create_paths(models_dir, run_id, no_logging=False):
 
     params_fpath = exp_dir / "params.txt"
     state_fpath = exp_dir / "model.pt"
-    return params_fpath, state_fpath, umap_dir
+    return train_data_dir, val_data_dir, params_fpath, state_fpath, umap_dir
 
 
 def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id):
