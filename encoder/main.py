@@ -25,9 +25,6 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
     """
     Main entry point for training.
     """
-    print("Initial GPU Usage")
-    gpu_usage()
-
     # create comet logger.
     logger = CometLogger(no_comet, is_existing=resume_experiment, prev_exp_key=prev_exp_key)
     run_id = logger.get_experiment_key()
@@ -43,7 +40,7 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
     val_loader = create_test_loader(val_data_dir, pm.val_speakers_per_batch,
                                     pm.val_utterances_per_speaker, pd.partials_n_frames)
     device, loss_device = get_devices(gpu_no)
-    device = torch.device('cpu')
+
     model, optimizer, init_step, model_val_eer = \
         create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id)
 
@@ -61,30 +58,18 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
     print("Starting training loop...")
     for step, speaker_batch in enumerate(train_loader, init_step):
         model.train()
-        print("After loading model")
-        gpu_usage()
 
         # Forward pass
         inputs = torch.from_numpy(speaker_batch.data).to(device)
-        print("After loading batch")
-        gpu_usage()
-
         embeds = model(inputs)
-        print("After forward pass")
-        gpu_usage()
-
         embeds_loss = embeds.view((pm.speakers_per_batch, pm.utterances_per_speaker, -1)).to(loss_device)
         loss, eer = model.loss(embeds_loss)
-        print("After loss computation")
-        gpu_usage()
 
         # Backward pass
         model.zero_grad()
         loss.backward()
         model.do_gradient_ops()
         optimizer.step()
-        print("After backward pass")
-        gpu_usage()
 
         logger.log_metrics({"EER": eer, "loss": loss.item()}, prefix="train", step=step)
         print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
@@ -114,9 +99,6 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
             projection_fpath = umap_dir / ("%s_umap_%06d.png" % (run_id, step))
             embeds = embeds.detach().cpu().numpy()
             logger.draw_projections(embeds, pm.utterances_per_speaker, step, projection_fpath)
-
-        print("At end of training loop")
-        gpu_usage()
 
 
 def test(test_data_dir: Path, exp_root_dir: Path, prev_exp_key: str,

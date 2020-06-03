@@ -20,14 +20,13 @@ class SpeakerEncoder(nn.Module):
         super().__init__()
 
         self.loss_device = loss_device
-        
-        # Network definition
-        # self.lstm = nn.LSTM(input_size=mel_n_channels,
-        #                     hidden_size=model_hidden_size,
-        #                     num_layers=model_num_layers,
-        #                     batch_first=True).to(device)
 
+        # Network definition
         if compression is None:
+            # self.lstm = nn.LSTM(input_size=mel_n_channels,
+            #                     hidden_size=model_hidden_size,
+            #                     num_layers=model_num_layers,
+            #                     batch_first=True).to(device)
             self.lstm = LSTM(mel_n_channels, model_hidden_size, model_num_layers, device)
             self.linear = nn.Linear(in_features=model_hidden_size,
                                  out_features=model_embedding_size).to(device)
