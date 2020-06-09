@@ -61,14 +61,9 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
 
         # Forward pass
         inputs = torch.from_numpy(speaker_batch.data).to(device)
-
-        print("Before forward pass")
-        gpu_usage()
         embeds = model(inputs)
         embeds_loss = embeds.view((pm.speakers_per_batch, pm.utterances_per_speaker, -1)).to(loss_device)
         loss, eer = model.loss(embeds_loss)
-        print("After forward pass")
-        gpu_usage()
 
         # Backward pass
         model.zero_grad()
@@ -77,7 +72,7 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
         optimizer.step()
 
         logger.log_metrics({"EER": eer, "loss": loss.item()}, prefix="train", step=step)
-        print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
+        # print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
 
         if val_every != 0 and step % val_every == 0:
             avg_val_loss, avg_val_eer = evaluate(val_loader, model, pm.val_speakers_per_batch,

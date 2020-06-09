@@ -8,16 +8,16 @@ class TTLinear_lowmem(TTLinear):
         super().__init__(*args, **kwargs)
 
     def forward(self, x):
+        # do forward pass on CPU to save GPU memory.
         cpu_device = torch.device('cpu')
-        gpu_device = torch.device('cuda')
 
         weight_t = self.weight_t.to(cpu_device)
         x_t = x.transpose(0, 1).to(cpu_device)
 
         if self.bias is None:
-            return tt_expand_matmul(weight_t, x_t, cpu_device).transpose(0, 1).to(gpu_device)
+            return tt_expand_matmul(weight_t, x_t, cpu_device).transpose(0, 1).to(x.device)
         else:
-            return tt_expand_matmul(weight_t, x_t, cpu_device).transpose(0, 1).to(gpu_device) + self.bias
+            return tt_expand_matmul(weight_t, x_t, cpu_device).transpose(0, 1).to(x.device) + self.bias
 
 
 def tt_expand_matmul(tt_matrix_a, matrix_b, device):
