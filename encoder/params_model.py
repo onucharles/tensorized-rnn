@@ -5,10 +5,10 @@ model_embedding_size = 256
 model_num_layers = 3
 
 # Training parameters
-n_steps = 2e4
+n_steps = 1 #2e4
 learning_rate_init = 1e-3
-speakers_per_batch = 64
-utterances_per_speaker = 32
+speakers_per_batch = 10
+utterances_per_speaker = 6
 
 ## Tensor-train parameters for last linear layer.
 compression = 'tt'

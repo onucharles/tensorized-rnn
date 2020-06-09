@@ -61,9 +61,14 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
 
         # Forward pass
         inputs = torch.from_numpy(speaker_batch.data).to(device)
+
+        print("Before forward pass")
+        gpu_usage()
         embeds = model(inputs)
         embeds_loss = embeds.view((pm.speakers_per_batch, pm.utterances_per_speaker, -1)).to(loss_device)
         loss, eer = model.loss(embeds_loss)
+        print("After forward pass")
+        gpu_usage()
 
         # Backward pass
         model.zero_grad()
