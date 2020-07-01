@@ -1,6 +1,10 @@
 COMET_API_KEY = "w7QuiECYXbNiOozveTpjc9uPg"
 COMET_WORKSPACE = "onucharles"
-PROJECT_NAME = "speech-model-compression"
+PROJECT_NAME = "speech-model-compression-customlstm"
+
+TRAIN_DATA_FOLDER = "_librispeech_train-clean-100_tisv"
+VAL_DATA_FOLDER = "_librispeech_dev-clean_tisv"
+TEST_DATA_FOLDER = "_librispeech_test-clean_tisv"
 
 librispeech_datasets = {
     "train": {

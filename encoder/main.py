@@ -6,45 +6,52 @@ import numpy as np
 import random
 import warnings
 import json
+from torchsummary import summary
+from GPUtil import showUtilization as gpu_usage
 
 from encoder.data_objects import SpeakerVerificationDataLoader, SpeakerVerificationDataset, \
     SpeakerVerificationTestSet, SpeakerVerificationTestDataLoader
-from encoder.model import SpeakerEncoder
+from encoder.models.speaker_encoder import SpeakerEncoder
 from utils.modelutils import count_model_params
-from utils.ioutils import load_json, save_json
-# from .test import evaluate
+from utils.ioutils import load_json
 from encoder import params_model as pm
 from encoder import params_data as pd
+from encoder import config
 
 
-def train(clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
-        umap_every: int, val_every: int, resume_experiment: bool, prev_exp_key: str,
-        no_comet: bool, gpu_no: int, seed: int):
+def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: int,
+          resume_experiment: bool, prev_exp_key: str, no_comet: bool, gpu_no: int,
+          seed: int):
     """
     Main entry point for training.
     """
-
     # create comet logger.
     logger = CometLogger(no_comet, is_existing=resume_experiment, prev_exp_key=prev_exp_key)
     run_id = logger.get_experiment_key()
 
     # log or load training parameters.
-    params_fpath, state_fpath, umap_dir = create_paths(models_dir, run_id)
+    train_data_dir, val_data_dir, params_fpath, state_fpath, umap_dir = \
+        create_paths(clean_data_root, models_dir, run_id)
     log_or_load_parameters(logger, resume_experiment, params_fpath, no_comet)
 
     # setup dataset and model.
     set_seed(seed)
-    train_loader = create_train_loader(clean_data_root)
-    val_loader = create_test_loader(clean_data_root_val, pm.val_speakers_per_batch,
+    train_loader = create_train_loader(train_data_dir)
+    val_loader = create_test_loader(val_data_dir, pm.val_speakers_per_batch,
                                     pm.val_utterances_per_speaker, pd.partials_n_frames)
     device, loss_device = get_devices(gpu_no)
+
     model, optimizer, init_step, model_val_eer = \
         create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id)
 
-    if pm.use_tt:
-        logger.add_tag("tt-cores{}-rank{}".format(pm.n_cores, pm.tt_rank))
+    if pm.compression == 'tt':
+        logger.add_tag("tt-cores{}-rank{}".format(pm.n_cores, pm.rank))
+    elif pm.compression == 'lr':
+        logger.add_tag("low-rank{}".format(pm.rank))
+    elif pm.compression is None:
+        logger.add_tag("no-comp")
     else:
-        logger.add_tag("no-tt")
+        raise ValueError('Unknown compression value: "{}"'.format(pm.compression))
 
     # Training loop
     best_val_eer = model_val_eer
@@ -65,7 +72,7 @@ def train(clean_data_root: Path, clean_data_root_val: Path, models_dir: Path,
         optimizer.step()
 
         logger.log_metrics({"EER": eer, "loss": loss.item()}, prefix="train", step=step)
-        print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
+        # print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
 
         if val_every != 0 and step % val_every == 0:
             avg_val_loss, avg_val_eer = evaluate(val_loader, model, pm.val_speakers_per_batch,
@@ -116,7 +123,7 @@ def test(test_data_dir: Path, exp_root_dir: Path, prev_exp_key: str,
     device, loss_device = get_devices(gpu_no)
     model = SpeakerEncoder(pd.mel_n_channels, pm.model_hidden_size, pm.model_num_layers,
                            pm.model_embedding_size, device, loss_device, use_low_rank=pm.use_low_rank,
-                           use_tt=pm.use_tt, n_cores=pm.n_cores, tt_rank=pm.tt_rank)
+                           use_tt=pm.use_tt, n_cores=pm.n_cores, rank=pm.rank)
     if state_fpath.exists():
         print("Found existing model \"%s\", loading it." % state_fpath)
         checkpoint = torch.load(state_fpath)
@@ -195,7 +202,9 @@ def create_test_loader(clean_data_root, speakers_per_batch, utterances_per_speak
     return test_loader
 
 
-def create_paths(models_dir, run_id, no_logging=False):
+def create_paths(data_dir, models_dir, run_id, no_logging=False):
+    train_data_dir = data_dir / config.TRAIN_DATA_FOLDER
+    val_data_dir = data_dir / config.VAL_DATA_FOLDER
     exp_dir = models_dir / run_id
     umap_dir = exp_dir / "umap_pngs"
 
@@ -205,14 +214,16 @@ def create_paths(models_dir, run_id, no_logging=False):
 
     params_fpath = exp_dir / "params.txt"
     state_fpath = exp_dir / "model.pt"
-    return params_fpath, state_fpath, umap_dir
+    return train_data_dir, val_data_dir, params_fpath, state_fpath, umap_dir
 
 
 def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id):
     # model
     model = SpeakerEncoder(pd.mel_n_channels, pm.model_hidden_size, pm.model_num_layers,
-                           pm.model_embedding_size, device, loss_device, use_low_rank=pm.use_low_rank,
-                           use_tt=pm.use_tt, n_cores=pm.n_cores, tt_rank=pm.tt_rank)
+                           pm.model_embedding_size, device, loss_device,
+                           compression=pm.compression, n_cores=pm.n_cores,
+                           rank=pm.rank)
+    # summary(model, (pd.partials_n_frames, pd.mel_n_channels))
     n_trainable, n_nontrainable = count_model_params(model)
     print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"
           .format(n_trainable, n_nontrainable, n_trainable + n_nontrainable))
