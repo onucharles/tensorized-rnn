@@ -3,7 +3,7 @@ from torch.autograd import Variable
 import torch.optim as optim
 import torch.nn.functional as F
 from utils import data_generator
-from model import MNIST_Classifier
+from mnist_classifier import MNIST_Classifier
 import numpy as np
 import argparse
 
@@ -16,7 +16,7 @@ parser.add_argument('--cuda', action='store_false',
 #                     help='dropout applied to layers (default: 0.05)')
 parser.add_argument('--clip', type=float, default=-1,
                     help='gradient clip, -1 means no clip (default: -1)')
-parser.add_argument('--epochs', type=int, default=20,
+parser.add_argument('--epochs', type=int, default=1,
                     help='upper epoch limit (default: 20)')
 # parser.add_argument('--ksize', type=int, default=7,
 #                     help='kernel size (default: 7)')
@@ -88,6 +88,7 @@ def train(ep):
                 ep, batch_idx * batch_size, len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), train_loss.item()/args.log_interval, steps))
             train_loss = 0
+        break
 
 def test():
     model.eval()

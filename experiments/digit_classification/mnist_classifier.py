@@ -3,9 +3,9 @@ from torch import nn
 import sys
 
 # sys.path.append("../")
-from t3nsor.layers import TTLinear
-from encoder.models.lstm import LSTM
-from encoder.models.tt_lstm import TTLSTM
+# from t3nsor.layers import TTLinear
+# from encoder.models.lstm import LSTM
+# from encoder.models.tt_lstm import TTLSTM
 
 
 class MNIST_Classifier(nn.Module):

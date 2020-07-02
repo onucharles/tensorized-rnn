@@ -6,11 +6,12 @@ from torch import nn
 import numpy as np
 import torch
 
+from .context import tensorized_rnn
 from t3nsor.layers import TTLinear
 from utils.modelutils import count_model_params
-from .lstm import LSTM
-from .tt_lstm import TTLSTM
-from .lr_linear import LRLinear
+from tensorized_rnn.lstm import LSTM
+from tensorized_rnn.tt_lstm import TTLSTM
+from tensorized_rnn.lr_linear import LRLinear
 
 
 class SpeakerEncoder(nn.Module):
