@@ -16,20 +16,20 @@ parser.add_argument('--cuda', action='store_false',
 #                     help='dropout applied to layers (default: 0.05)')
 parser.add_argument('--clip', type=float, default=-1,
                     help='gradient clip, -1 means no clip (default: -1)')
-parser.add_argument('--epochs', type=int, default=1,
+parser.add_argument('--epochs', type=int, default=20,
                     help='upper epoch limit (default: 20)')
 # parser.add_argument('--ksize', type=int, default=7,
 #                     help='kernel size (default: 7)')
-parser.add_argument('--levels', type=int, default=8,
-                    help='# of levels (default: 8)')
+parser.add_argument('--levels', type=int, default=2,
+                    help='# of levels (default: 2)')
 parser.add_argument('--log-interval', type=int, default=100, metavar='N',
                     help='report interval (default: 100')
 parser.add_argument('--lr', type=float, default=2e-3,
                     help='initial learning rate (default: 2e-3)')
 parser.add_argument('--optim', type=str, default='Adam',
                     help='optimizer to use (default: Adam)')
-parser.add_argument('--nhid', type=int, default=25,
-                    help='number of hidden units per layer (default: 25)')
+parser.add_argument('--nhid', type=int, default=32,
+                    help='number of hidden units per layer (default: 32)')
 parser.add_argument('--seed', type=int, default=1111,
                     help='random seed (default: 1111)')
 parser.add_argument('--permute', action='store_true',
@@ -44,7 +44,7 @@ if torch.cuda.is_available():
 root = './data/mnist'
 batch_size = args.batch_size
 n_classes = 10
-input_channels = 1
+input_channels = 28
 seq_length = int(784 / input_channels)
 epochs = args.epochs
 steps = 0
@@ -88,7 +88,6 @@ def train(ep):
                 ep, batch_idx * batch_size, len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), train_loss.item()/args.log_interval, steps))
             train_loss = 0
-        break
 
 def test():
     model.eval()
@@ -108,7 +107,7 @@ def test():
             correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
         test_loss /= len(test_loader.dataset)
-        print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+        print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
             test_loss, correct, len(test_loader.dataset),
             100. * correct / len(test_loader.dataset)))
         return test_loss
