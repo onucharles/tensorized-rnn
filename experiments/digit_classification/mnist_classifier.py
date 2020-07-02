@@ -9,15 +9,26 @@ from tensorized_rnn.tt_lstm import TTLSTM
 
 
 class MNIST_Classifier(nn.Module):
-    def __init__(self, input_size, output_size, hidden_size, num_layers):
+    def __init__(self, input_size, output_size, hidden_size, num_layers,
+                 tt_lstm=True, n_cores=3, tt_rank=2):
         super(MNIST_Classifier, self).__init__()
+        self.tt_lstm = tt_lstm
 
-        ### PYTORCH LSTM
-        # self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
-                            # num_layers=num_layers, batch_first=True)
-        # self.linear = nn.Linear(hidden_size, output_size)
+        if tt_lstm:
+            ### CUSTOM LSTM
+            device = (torch.device('cuda:0') if torch.cuda.is_available() 
+                      else 'cpu')
+            self.lstm = TTLSTM(input_size=input_size, hidden_size=hidden_size,
+                                num_layers=num_layers, device=device,
+                                n_cores=n_cores, tt_rank=tt_rank)
+            self.linear = TTLinear(in_features=hidden_size, out_features=output_size,
+                                   bias=True, auto_shapes=True, d=3, tt_rank=2).to(device)
+        else:
+            ### PYTORCH LSTM
+            self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
+                                num_layers=num_layers, batch_first=True)
+            self.linear = nn.Linear(hidden_size, output_size)
 
-        ### CUSTOM LSTM
         device = torch.device('cuda:1')
         self.lstm = TTLSTM(input_size=input_size, hidden_size=hidden_size,
                              num_layers=num_layers, device=device, bias=True,
@@ -28,10 +39,11 @@ class MNIST_Classifier(nn.Module):
     def forward(self, inputs):
         out, (last_hidden, last_cell) = self.lstm(inputs)
 
-        ### PYTORCH LSTM
-        # o = self.linear(out[:, -1, :])
-
-        ### CUSTOM LSTM
-        o = self.linear(last_hidden)
+        if self.tt_lstm:
+            ### CUSTOM LSTM
+            o = self.linear(last_hidden)
+        else:
+            ### PYTORCH LSTM
+            o = self.linear(out[:, -1, :])
 
         return F.log_softmax(o, dim=1)
