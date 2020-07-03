@@ -57,6 +57,9 @@ permute = torch.Tensor(np.random.permutation(784).astype(np.float64)).long()
 # kernel_size = args.ksize
 model = MNIST_Classifier(input_channels, n_classes, args.nhid, args.levels)
 
+device = torch.device('cuda:1')
+torch.cuda.set_device(device)
+
 if args.cuda:
     model.cuda()
     permute = permute.cuda()
