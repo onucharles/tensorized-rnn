@@ -11,7 +11,7 @@ from GPUtil import showUtilization as gpu_usage
 
 from encoder.data_objects import SpeakerVerificationDataLoader, SpeakerVerificationDataset, \
     SpeakerVerificationTestSet, SpeakerVerificationTestDataLoader
-from encoder.models.speaker_encoder import SpeakerEncoder
+from encoder.speaker_encoder import SpeakerEncoder
 from utils.modelutils import count_model_params
 from utils.ioutils import load_json
 from encoder import params_model as pm

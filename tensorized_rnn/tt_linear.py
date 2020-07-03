@@ -8,17 +8,26 @@ class TTLinear_lowmem(TTLinear):
         super().__init__(*args, **kwargs)
 
     def forward(self, x):
-        # do forward pass on CPU to save GPU memory.
-        cpu_device = torch.device('cpu')
+        # NOTE: currently disabled forced transfer to CPU.
 
-        weight_t = self.weight_t.to(cpu_device)
-        x_t = x.transpose(0, 1).to(cpu_device)
+        # do forward pass on CPU to save GPU memory.
+        # cpu_device = torch.device('cpu')
+
+        # weight_t = self.weight_t.to(cpu_device)
+        # x_t = x.transpose(0, 1).to(cpu_device)
+
+        # if self.bias is None:
+            # return tt_expand_matmul(weight_t, x_t, cpu_device).transpose(0, 1).to(x.device)
+        # else:
+            # return tt_expand_matmul(weight_t, x_t, cpu_device).transpose(0, 1).to(x.device) + self.bias
+
+        weight_t = self.weight_t
+        x_t = x.transpose(0, 1)
 
         if self.bias is None:
-            return tt_expand_matmul(weight_t, x_t, cpu_device).transpose(0, 1).to(x.device)
+            return tt_expand_matmul(weight_t, x_t, x.device).transpose(0, 1)
         else:
-            return tt_expand_matmul(weight_t, x_t, cpu_device).transpose(0, 1).to(x.device) + self.bias
-
+            return tt_expand_matmul(weight_t, x_t, x.device).transpose(0, 1) + self.bias
 
 def tt_expand_matmul(tt_matrix_a, matrix_b, device):
     """Multiplies a TT-matrix by a regular matrix, returns a regular matrix.
