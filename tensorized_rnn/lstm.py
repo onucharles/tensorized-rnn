@@ -65,16 +65,28 @@ class LSTM(nn.Module):
         return h, c
 
     def forward(self, input, init_states=None):
-        # TODO: Clearly document input and output shapes.
-        # input: (batch_size, n_steps, input_size)
+        """
+        :param input:       Tensor of input data of shape (batch_size, seq_len, input_size).
+        :param init_states: Initial hidden states of LSTM. If None, is initialized to zeros.
+                            Shape is (batch_size, hidden_size).
 
-        batch_size, n_steps, input_size = input.size()
-        outputs = []    # TODO : Change to torch array to make output identical to torch.nn.LSTM
+        :return:    outputs, (h, c)
+                    outputs:  Torch tensor of shape (seq_len, batch_size, hidden_size) containing
+                              output features from last layer of LSTM.
+                    h:        Output features (ie hiddens state) from last time step of the last layer.
+                              Shape is (batch_size, hidden_size)
+                    c:        Cell state from last time step of the last layer.
+                              Shape is (batch_size, hidden_size)
+        """
 
+        batch_size, seq_len, input_size = input.size()
+        outputs = torch.zeros(batch_size, seq_len, self.hidden_size).to(input.device)
+
+        # initialise hidden and cell states.
         (h, c) = self.init_hidden(batch_size) if init_states is None else init_states
         internal_state = [(h, c)] * self.num_layers
 
-        for step in range(n_steps):
+        for step in range(seq_len):
             x = input[:, step, :]
             for i in range(self.num_layers):
                 # name = 'cell{}'.format(i)
@@ -84,8 +96,6 @@ class LSTM(nn.Module):
                 (h, c) = internal_state[i]
                 x, new_c = lstm_cell(x, h, c)
                 internal_state[i] = (x, new_c)
+            outputs[:, step, :] = x
 
-            outputs.append(x)
-
-        # outputs = torch.stack(outputs, dim=0)
         return outputs, (x, new_c)
