@@ -12,6 +12,8 @@ parser.add_argument('--batch_size', type=int, default=64, metavar='N',
                     help='batch size (default: 64)')
 parser.add_argument('--cuda', action='store_false',
                     help='use CUDA (default: True)')
+parser.add_argument('--ttlstm', action='store_true',
+                    help='use tensorized LSTM (default: False)')
 # parser.add_argument('--dropout', type=float, default=0.05,
 #                     help='dropout applied to layers (default: 0.05)')
 parser.add_argument('--clip', type=float, default=-1,
@@ -33,7 +35,12 @@ parser.add_argument('--nhid', type=int, default=32,
 parser.add_argument('--seed', type=int, default=1111,
                     help='random seed (default: 1111)')
 parser.add_argument('--permute', action='store_true',
-                    help='use permuted MNIST (default: false)')
+                    help='use permuted MNIST (default: False)')
+parser.add_argument('--ncores', type=int, default=3,
+                    help='number of TT cores (default: 3)')
+parser.add_argument('--ttrank', type=int, default=2,
+                    help='TT rank (default: 2)')
+
 args = parser.parse_args()
 
 torch.manual_seed(args.seed)
@@ -55,7 +62,9 @@ train_loader, test_loader = data_generator(root, batch_size)
 permute = torch.Tensor(np.random.permutation(784).astype(np.float64)).long()
 # channel_sizes = [args.nhid] * args.levels
 # kernel_size = args.ksize
-model = MNIST_Classifier(input_channels, n_classes, args.nhid, args.levels)
+model = MNIST_Classifier(input_channels, n_classes, args.nhid, args.levels,
+                         tt_lstm=args.ttlstm, n_cores=args.ncores, 
+                         tt_rank=args.ttrank)
 
 device = torch.device('cuda:1')
 torch.cuda.set_device(device)
