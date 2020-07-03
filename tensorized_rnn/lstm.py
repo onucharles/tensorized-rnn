@@ -65,10 +65,11 @@ class LSTM(nn.Module):
         return h, c
 
     def forward(self, input, init_states=None):
+        # TODO: Clearly document input and output shapes.
         # input: (batch_size, n_steps, input_size)
 
         batch_size, n_steps, input_size = input.size()
-        outputs = []
+        outputs = []    # TODO : Change to torch array to make output identical to torch.nn.LSTM
 
         (h, c) = self.init_hidden(batch_size) if init_states is None else init_states
         internal_state = [(h, c)] * self.num_layers

@@ -14,14 +14,10 @@ parser.add_argument('--cuda', action='store_false',
                     help='use CUDA (default: True)')
 parser.add_argument('--ttlstm', action='store_true',
                     help='use tensorized LSTM (default: False)')
-# parser.add_argument('--dropout', type=float, default=0.05,
-#                     help='dropout applied to layers (default: 0.05)')
 parser.add_argument('--clip', type=float, default=-1,
                     help='gradient clip, -1 means no clip (default: -1)')
 parser.add_argument('--epochs', type=int, default=20,
                     help='upper epoch limit (default: 20)')
-# parser.add_argument('--ksize', type=int, default=7,
-#                     help='kernel size (default: 7)')
 parser.add_argument('--levels', type=int, default=2,
                     help='# of levels (default: 2)')
 parser.add_argument('--log-interval', type=int, default=100, metavar='N',
@@ -45,6 +41,11 @@ args = parser.parse_args()
 
 torch.manual_seed(args.seed)
 if torch.cuda.is_available():
+    # set default cuda device.
+    device = torch.device('cuda:0')
+    torch.cuda.set_device(device)
+
+    # warn if not using cuda and gpu is available.
     if not args.cuda:
         print("WARNING: You have a CUDA device, so you should probably run with --cuda")
 
@@ -60,14 +61,9 @@ print(args)
 train_loader, test_loader = data_generator(root, batch_size)
 
 permute = torch.Tensor(np.random.permutation(784).astype(np.float64)).long()
-# channel_sizes = [args.nhid] * args.levels
-# kernel_size = args.ksize
-model = MNIST_Classifier(input_channels, n_classes, args.nhid, args.levels,
+model = MNIST_Classifier(input_channels, n_classes, args.nhid, args.levels, device,
                          tt_lstm=args.ttlstm, n_cores=args.ncores, 
                          tt_rank=args.ttrank)
-
-device = torch.device('cuda:1')
-torch.cuda.set_device(device)
 
 if args.cuda:
     model.cuda()
