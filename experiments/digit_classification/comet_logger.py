@@ -3,8 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import umap
 
-from encoder.data_objects.speaker_verification_dataset import SpeakerVerificationDataset
-from .config import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
+from config import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
 
 class CometLogger():
     def __init__(self, disabled, is_existing=False, prev_exp_key=None):
@@ -44,28 +43,7 @@ class CometLogger():
     def log_params(self, params_dict):
         self.experiment.log_parameters(params_dict)
 
-    def log_dataset(self, dataset: SpeakerVerificationDataset):
-        if self.disabled:
-            return
-        dataset_string = ""
-        dataset_string += "<b>Speakers</b>: %s\n" % len(dataset.speakers)
-        dataset_string += "\n" + dataset.get_logs()
-        dataset_string = dataset_string.replace("\n", "<br>")
-        self.vis.text(dataset_string, opts={"title": "Dataset"})
-
-    def log_implementation(self, params):
-        if self.disabled:
-            return
-        implementation_string = ""
-        for param, value in params.items():
-            implementation_string += "<b>%s</b>: %s\n" % (param, value)
-            implementation_string = implementation_string.replace("\n", "<br>")
-        self.implementation_string = implementation_string
-        self.implementation_win = self.vis.text(
-            implementation_string,
-            opts={"title": "Training implementation"}
-        )
-
+    # TODO: need to rewrite before can be used for MNIST.
     def draw_projections(self, embeds, utterances_per_speaker, step, out_fpath=None,
                          max_speakers=16):
         if self.disabled:

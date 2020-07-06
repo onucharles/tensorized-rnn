@@ -1,15 +1,20 @@
+from comet_logger import CometLogger
+
 import torch
 from torch.autograd import Variable
 import torch.optim as optim
 import torch.nn.functional as F
-from utils import data_generator
-from mnist_classifier import MNIST_Classifier
 import numpy as np
 import argparse
+from pathlib import Path
+
+from utils import data_generator
+from mnist_classifier import MNIST_Classifier
+
 
 parser = argparse.ArgumentParser(description='Sequence Modeling - (Permuted) Sequential MNIST')
-parser.add_argument('--batch_size', type=int, default=64, metavar='N',
-                    help='batch size (default: 64)')
+parser.add_argument('--batch_size', type=int, default=128, metavar='N',
+                    help='batch size (default: 128)')
 parser.add_argument('--cuda', action='store_false',
                     help='use CUDA (default: True)')
 parser.add_argument('--ttlstm', action='store_true',
@@ -18,15 +23,15 @@ parser.add_argument('--clip', type=float, default=-1,
                     help='gradient clip, -1 means no clip (default: -1)')
 parser.add_argument('--epochs', type=int, default=20,
                     help='upper epoch limit (default: 20)')
-parser.add_argument('--levels', type=int, default=2,
-                    help='# of levels (default: 2)')
+parser.add_argument('--n_layers', type=int, default=2,
+                    help='# of layers (default: 2)')
 parser.add_argument('--log-interval', type=int, default=100, metavar='N',
                     help='report interval (default: 100')
 parser.add_argument('--lr', type=float, default=2e-3,
                     help='initial learning rate (default: 2e-3)')
 parser.add_argument('--optim', type=str, default='Adam',
                     help='optimizer to use (default: Adam)')
-parser.add_argument('--nhid', type=int, default=32,
+parser.add_argument('--hidden_size', type=int, default=32,
                     help='number of hidden units per layer (default: 32)')
 parser.add_argument('--seed', type=int, default=1111,
                     help='random seed (default: 1111)')
@@ -36,8 +41,16 @@ parser.add_argument('--ncores', type=int, default=3,
                     help='number of TT cores (default: 3)')
 parser.add_argument('--ttrank', type=int, default=2,
                     help='TT rank (default: 2)')
+parser.add_argument('--enable_logging', action='store_true',
+                    help='Log metrics to Comet and save model to disk (default: False)')
+parser.add_argument('--models_dir', type=str, help='Path to saved model files.')
 
 args = parser.parse_args()
+
+# create comet logger.
+logger = CometLogger(not args.enable_logging, is_existing=False, prev_exp_key=None)
+run_id = logger.get_experiment_key()
+logger.log_params(vars(args))
 
 torch.manual_seed(args.seed)
 if torch.cuda.is_available():
@@ -61,7 +74,7 @@ print(args)
 train_loader, test_loader = data_generator(root, batch_size)
 
 permute = torch.Tensor(np.random.permutation(784).astype(np.float64)).long()
-model = MNIST_Classifier(input_channels, n_classes, args.nhid, args.levels, device,
+model = MNIST_Classifier(input_channels, n_classes, args.hidden_size, args.n_layers, device,
                          tt_lstm=args.ttlstm, n_cores=args.ncores, 
                          tt_rank=args.ttrank)
 
@@ -75,6 +88,7 @@ optimizer = getattr(optim, args.optim)(model.parameters(), lr=lr)
 def train(ep):
     global steps
     train_loss = 0
+    train_correct = 0
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         if args.cuda: data, target = data.cuda(), target.cuda()
@@ -89,13 +103,21 @@ def train(ep):
         if args.clip > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
         optimizer.step()
+
+        pred = output.data.max(1, keepdim=True)[1]
+        train_correct += pred.eq(target.data.view_as(pred)).cpu().sum()
         train_loss += loss
-        steps += seq_length
+        steps += 1
         if batch_idx > 0 and batch_idx % args.log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tSteps: {}'.format(
+            avg_train_loss = train_loss.item() / args.log_interval
+            avg_train_acc = 100. * train_correct.item() / (args.log_interval * batch_size)
+            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAccuracy: ({:.2f}%)\tSteps: {}'.format(
                 ep, batch_idx * batch_size, len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), train_loss.item()/args.log_interval, steps))
+                100. * batch_idx / len(train_loader), avg_train_loss, avg_train_acc, steps))
+            logger.log_metrics({"loss": avg_train_loss, "accuracy": avg_train_acc},
+                               prefix="train", step=steps)
             train_loss = 0
+            train_correct = 0
 
 def test():
     model.eval()
@@ -115,9 +137,10 @@ def test():
             correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
         test_loss /= len(test_loader.dataset)
+        test_acc = 100. * correct / len(test_loader.dataset)
         print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
-            test_loss, correct, len(test_loader.dataset),
-            100. * correct / len(test_loader.dataset)))
+            test_loss, correct, len(test_loader.dataset), test_acc))
+        logger.log_metrics({"accuracy": test_acc, "loss": test_loss}, prefix="test", step=steps)
         return test_loss
 
 
