@@ -15,6 +15,50 @@ The left/right global matrix dimensions are the product of the left/right
 local matrix dimensions.
 """
 
+class ActivationGradLogger():
+    # Global info for dealing with different loggers
+    all_loggers = dict()
+    def find_logger(name):
+        """Return a logger which has already been initialized elsewhere"""
+        assert name in all_loggers
+        return all_loggers[name]
+
+    def __init__(self, name):
+        # Name of the variable being logged
+        assert name not in all_loggers
+        all_loggers[name] = self
+        self.name = name
+
+        # Lists for storing the average activation and gradient norms, as 
+        # well as the average of their logarithms
+        self.act_averages = []
+        self.logact_averages = []
+        self.grad_averages = []
+        self.loggrad_averages = []
+
+        # Lists for storing the activations and gradients from each minibatch
+        self.activations = []
+        self.gradients = []
+
+    def create_hooks():
+        """
+        Creates forward and backward hooks to use for logging distribution
+        of activation and gradient variables
+        """
+        def forward_hook():
+            pass
+
+        def backward_hook():
+            pass
+
+        return forward_hook, backward_hook
+
+    def end_epoch(self):
+        """
+        Averages gradients and activations from last epoch, starts new record
+        """
+        pass
+
 def project_ttgrad(base_tt, grad_tt):
     """
     Projects local gradients from cores of TT matrix to dense matrix gradient
