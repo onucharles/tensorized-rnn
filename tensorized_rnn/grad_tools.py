@@ -22,6 +22,56 @@ class ActivGradLogger():
     all_loggers = dict()
 
     @staticmethod
+    def get_logs():
+        """
+        Returns a dictionary of activation and gradient averages across
+        different epochs and locations in the LSTM
+
+        The keys of the dictionary are pairs (variable, quantity), where 
+        variable denotes part of the LSTM state (e.g. 'hidden_1'), and 
+        quantity denotes a given average (e.g. 'log_grad'). These satisfy:
+
+        variable in ['hidden_i', 'cell_i'], for i = 0,1,...,n_layers-1, and
+        quantity in ['act', 'log_act', 'grad', 'log_grad']
+
+        Each log_dict[(variable, quantity)] is a matrix of shape:
+                    (num_epochs, seq_len)
+        """
+        log_dict = dict()
+        quantities = ['act', 'log_act', 'grad', 'log_grad']
+        for var, logger in ActivGradLogger.all_loggers.items():
+            for qnt in quantities:
+                record_mat = getattr(logger, f'{qnt}_epoch')
+                log_dict[(var, qnt)] = torch.stack(record_mat)
+
+        return log_dict
+
+    def __init__(self, name):
+        # Name of the variable being logged
+        all_loggers = ActivGradLogger.all_loggers
+        assert name not in all_loggers
+        all_loggers[name] = self
+        self.name = name
+
+        # Info for storing the activations and gradients between epochs
+        self.act_epoch = []
+        self.grad_epoch = []
+        self.log_act_epoch = []
+        self.log_grad_epoch = []
+
+        # Info for storing the activations and gradients within an epoch
+        self.act_mini = []
+        self.grad_mini = []
+        self.log_act_mini = []
+        self.log_grad_mini = []
+
+        # Info for storing the activations and gradients within a minibatch
+        self.act = []
+        self.grad = deque()
+        self.log_act = []
+        self.log_grad = deque()
+        
+    @staticmethod
     def get_logger(name):
         """Return a logger which has already been initialized elsewhere"""
         assert isinstance(name, dict)
@@ -52,31 +102,6 @@ class ActivGradLogger():
         for logger in all_loggers.values():
             logger._del_record()
 
-    def __init__(self, name):
-        # Name of the variable being logged
-        all_loggers = ActivGradLogger.all_loggers
-        assert name not in all_loggers
-        all_loggers[name] = self
-        self.name = name
-
-        # Info for storing the activations and gradients between epochs
-        self.act_epoch = []
-        self.grad_epoch = []
-        self.logact_epoch = []
-        self.loggrad_epoch = []
-
-        # Info for storing the activations and gradients within an epoch
-        self.act_mini = []
-        self.grad_mini = []
-        self.logact_mini = []
-        self.loggrad_mini = []
-
-        # Info for storing the activations and gradients within a minibatch
-        self.act = []
-        self.grad = deque()
-        self.logact = []
-        self.loggrad = deque()
-
     def create_hooks(self, output_ind):
         """
         Creates forward and backward hooks to use for logging distribution
@@ -95,11 +120,11 @@ class ActivGradLogger():
             target = outputs[output_ind].detach()
             assert isinstance(target, torch.Tensor)
             av_act = av_norm(target)
-            av_logact = av_norm(target, average_logs=True)
+            av_log_act = av_norm(target, average_logs=True)
 
             # Add to our running list
             self.act.append(av_act)
-            self.logact.append(av_logact)
+            self.log_act.append(av_log_act)
 
         @torch.no_grad()
         def backward_hook(grad_out):
@@ -111,12 +136,12 @@ class ActivGradLogger():
             target = grad_out.detach()
             assert isinstance(target, torch.Tensor)
             av_grad = av_norm(target)
-            av_loggrad = av_norm(target, average_logs=True)
+            av_log_grad = av_norm(target, average_logs=True)
 
             # Add to our running list (gradients must be prepended, since
             # they're added in reverse order)
             self.grad.appendleft(av_grad)
-            self.loggrad.appendleft(av_loggrad)
+            self.log_grad.appendleft(av_log_grad)
 
         return forward_hook, backward_hook
 
@@ -127,32 +152,32 @@ class ActivGradLogger():
         # Average across minibatches and append to global list
         self.act_epoch.append(torch.mean(torch.stack(self.act_mini), 0))
         self.grad_epoch.append(torch.mean(torch.stack(self.grad_mini), 0))
-        self.logact_epoch.append(torch.mean(torch.stack(self.logact_mini), 0))
-        self.loggrad_epoch.append(torch.mean(torch.stack(self.loggrad_mini), 0))
+        self.log_act_epoch.append(torch.mean(torch.stack(self.log_act_mini), 0))
+        self.log_grad_epoch.append(torch.mean(torch.stack(self.log_grad_mini), 0))
 
         # Erase all single-epoch records
-        self.act_mini = self.grad_mini = self.logact_mini = self.loggrad_mini = []
+        self.act_mini = self.grad_mini = self.log_act_mini = self.log_grad_mini = []
 
     def _end_minibatch(self):
         """
         Records gradients and activations to *_mini variables
         """
         if self.act_mini == []:
-            assert self.logact_mini == self.grad_mini == self.loggrad_mini == []
+            assert self.log_act_mini == self.grad_mini == self.log_grad_mini == []
             self.act_mini = [torch.stack(self.act)]
-            self.logact_mini = [torch.stack(self.logact)]
+            self.log_act_mini = [torch.stack(self.log_act)]
             self.grad_mini = [torch.stack(list(self.grad))]
-            self.loggrad_mini = [torch.stack(list(self.loggrad))]
+            self.log_grad_mini = [torch.stack(list(self.log_grad))]
 
         else:
             assert len(self.act_mini[0]) == len(self.act)
             assert len(self.grad_mini[0]) == len(self.grad)
-            assert len(self.logact_mini[0]) == len(self.logact)
-            assert len(self.loggrad_mini[0]) == len(self.loggrad)
+            assert len(self.log_act_mini[0]) == len(self.log_act)
+            assert len(self.log_grad_mini[0]) == len(self.log_grad)
             self.act_mini.append(torch.stack(self.act))
-            self.logact_mini.append(torch.stack(self.logact))
+            self.log_act_mini.append(torch.stack(self.log_act))
             self.grad_mini.append(torch.stack(list(self.grad)))
-            self.loggrad_mini.append(torch.stack(list(self.loggrad)))
+            self.log_grad_mini.append(torch.stack(list(self.log_grad)))
 
         # Delete all gradients and activations
         self._del_record()
@@ -160,9 +185,9 @@ class ActivGradLogger():
     def _del_record(self):
         """In-place erase all single-batch records"""
         del self.act[:]
-        del self.logact[:]
+        del self.log_act[:]
         for i in range(len(self.grad)-1, -1, -1): del self.grad[i]
-        for i in range(len(self.loggrad)-1, -1, -1): del self.loggrad[i]
+        for i in range(len(self.log_grad)-1, -1, -1): del self.log_grad[i]
 
 def av_norm(tensor, average_logs=False):
     """

@@ -68,8 +68,8 @@ class LSTM(nn.Module):
         if log_grads:
             for i, cell in enumerate(self._all_layers):
                 # Hidden and cell state loggers
-                h_logger = ActivGradLogger(f"hidden_state_{i}")
-                c_logger = ActivGradLogger(f"cell_state_{i}")
+                h_logger = ActivGradLogger(f"hidden_{i}")
+                c_logger = ActivGradLogger(f"cell_{i}")
 
                 # Set up hooks for the loggers. Backward hooks on modules
                 # don't work well, so using the Tensor-level backward hook

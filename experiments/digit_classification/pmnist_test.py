@@ -164,3 +164,10 @@ if __name__ == "__main__":
             lr /= 10
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
+
+        # # Example of how logs can be accessed, with the average of the 
+        # # log activation in the layer 1 (second layer) cell state selected
+        # log_dict = AGL.get_logs()
+        # logact_averages = log_dict[('cell_1', 'log_act')]
+        # # Watch how the shape changes after each epoch
+        # print(logact_averages.shape)
