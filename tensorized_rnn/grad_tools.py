@@ -45,6 +45,13 @@ class ActivGradLogger():
         for logger in all_loggers.values():
             logger._end_minibatch()
 
+    @staticmethod
+    def del_record():
+        """Clears all local activations and gradients all loggers"""
+        all_loggers = ActivGradLogger.all_loggers
+        for logger in all_loggers.values():
+            logger._del_record()
+
     def __init__(self, name):
         # Name of the variable being logged
         all_loggers = ActivGradLogger.all_loggers
@@ -53,10 +60,10 @@ class ActivGradLogger():
         self.name = name
 
         # Info for storing the activations and gradients between epochs
-        self.act_epochs = []
-        self.grad_epochs = []
-        self.logact_epochs = []
-        self.loggrad_epochs = []
+        self.act_epoch = []
+        self.grad_epoch = []
+        self.logact_epoch = []
+        self.loggrad_epoch = []
 
         # Info for storing the activations and gradients within an epoch
         self.act_mini = []
@@ -118,10 +125,10 @@ class ActivGradLogger():
         Averages gradients and activations from this epoch, starts new record
         """
         # Average across minibatches and append to global list
-        self.act_epochs.append(torch.mean(torch.cat(self.act_mini, 1), 1))
-        self.grad_epochs.append(torch.mean(torch.cat(self.grad_mini, 1), 1))
-        self.logact_epochs.append(torch.mean(torch.cat(self.logact_mini, 1), 1))
-        self.loggrad_epochs.append(torch.mean(torch.cat(self.loggrad_mini, 1), 1))
+        self.act_epoch.append(torch.mean(torch.stack(self.act_mini), 0))
+        self.grad_epoch.append(torch.mean(torch.stack(self.grad_mini), 0))
+        self.logact_epoch.append(torch.mean(torch.stack(self.logact_mini), 0))
+        self.loggrad_epoch.append(torch.mean(torch.stack(self.loggrad_mini), 0))
 
         # Erase all single-epoch records
         self.act_mini = self.grad_mini = self.logact_mini = self.loggrad_mini = []
@@ -147,7 +154,11 @@ class ActivGradLogger():
             self.grad_mini.append(torch.stack(list(self.grad)))
             self.loggrad_mini.append(torch.stack(list(self.loggrad)))
 
-        # In-place erase all single-batch records
+        # Delete all gradients and activations
+        self._del_record()
+
+    def _del_record(self):
+        """In-place erase all single-batch records"""
         del self.act[:]
         del self.logact[:]
         for i in range(len(self.grad)-1, -1, -1): del self.grad[i]

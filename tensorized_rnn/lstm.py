@@ -33,8 +33,9 @@ class LSTMCell(nn.Module):
         hy = outgate * torch.tanh(cy)
 
         # Register gradient hooks if we have them
-        if hasattr(self, '_h_backward_hook'):
+        if hasattr(self, '_h_backward_hook') and hy.requires_grad:
             assert hasattr(self, '_c_backward_hook')
+            assert cy.requires_grad
             hy.register_hook(self._h_backward_hook)
             cy.register_hook(self._c_backward_hook)
 

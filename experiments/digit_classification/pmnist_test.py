@@ -44,6 +44,8 @@ parser.add_argument('--ttrank', type=int, default=2,
 parser.add_argument('--enable_logging', action='store_true',
                     help='Log metrics to Comet and save model to disk (default: False)')
 parser.add_argument('--models_dir', type=str, help='Path to saved model files.')
+parser.add_argument('--log_grads', action='store_true',
+                    help='Whether to log gradients and activations (default: False)')
 
 args = parser.parse_args()
 
@@ -61,6 +63,8 @@ if torch.cuda.is_available():
     # warn if not using cuda and gpu is available.
     if not args.cuda:
         print("WARNING: You have a CUDA device, so you should probably run with --cuda")
+else:
+    device = torch.device('cpu')
 
 root = './data/mnist'
 batch_size = args.batch_size
@@ -76,7 +80,11 @@ train_loader, test_loader = data_generator(root, batch_size)
 permute = torch.Tensor(np.random.permutation(784).astype(np.float64)).long()
 model = MNIST_Classifier(input_channels, n_classes, args.hidden_size, args.n_layers, device,
                          tt_lstm=args.ttlstm, n_cores=args.ncores, 
-                         tt_rank=args.ttrank)
+                         tt_rank=args.ttrank, log_grads=args.log_grads)
+
+# Setup activation and gradient logging
+if args.log_grads:
+    from tensorized_rnn.grad_tools import ActivGradLogger as AGL
 
 if args.cuda:
     model.cuda()
@@ -102,6 +110,7 @@ def train(ep):
         loss.backward()
         if args.clip > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
+        if args.log_grads: AGL.end_minibatch()
         optimizer.step()
 
         pred = output.data.max(1, keepdim=True)[1]
@@ -118,6 +127,8 @@ def train(ep):
                                prefix="train", step=steps)
             train_loss = 0
             train_correct = 0
+    if args.log_grads: AGL.end_epoch()
+
 
 def test():
     model.eval()
@@ -135,6 +146,7 @@ def test():
             test_loss += F.nll_loss(output, target, size_average=False).item()
             pred = output.data.max(1, keepdim=True)[1]
             correct += pred.eq(target.data.view_as(pred)).cpu().sum()
+            if args.log_grads: AGL.del_record()
 
         test_loss /= len(test_loader.dataset)
         test_acc = 100. * correct / len(test_loader.dataset)
