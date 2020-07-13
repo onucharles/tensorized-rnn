@@ -1,7 +1,6 @@
 from comet_ml import Experiment, ExistingExperiment
 import matplotlib.pyplot as plt
 import numpy as np
-import umap
 
 from config import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
 
@@ -49,6 +48,7 @@ class CometLogger():
     # TODO: need to rewrite before can be used for MNIST.
     def draw_projections(self, embeds, utterances_per_speaker, step, out_fpath=None,
                          max_speakers=16):
+        import umap
         if self.disabled:
             return
         max_speakers = min(max_speakers, len(colormap))

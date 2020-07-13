@@ -17,8 +17,10 @@ parser.add_argument('--batch_size', type=int, default=128, metavar='N',
                     help='batch size (default: 128)')
 parser.add_argument('--cuda', action='store_false',
                     help='use CUDA (default: True)')
-parser.add_argument('--ttlstm', action='store_true',
-                    help='use tensorized LSTM (default: False)')
+parser.add_argument('--tt', action='store_true',
+                    help='use tensorized RNN model (default: False)')
+parser.add_argument('--gru', action='store_true',
+                    help='use GRU instead of LSTM (default: False)')
 parser.add_argument('--clip', type=float, default=-1,
                     help='gradient clip, -1 means no clip (default: -1)')
 parser.add_argument('--epochs', type=int, default=20,
@@ -85,7 +87,7 @@ train_loader, test_loader = data_generator(root, batch_size)
 
 permute = torch.Tensor(np.random.permutation(784).astype(np.float64)).long()
 model = MNIST_Classifier(input_channels, n_classes, args.hidden_size, args.n_layers, device,
-                         tt_lstm=args.ttlstm, n_cores=args.ncores, 
+                         tt=args.tt, gru=args.gru, n_cores=args.ncores, 
                          tt_rank=args.ttrank, log_grads=args.log_grads)
 
 # Setup activation and gradient logging
