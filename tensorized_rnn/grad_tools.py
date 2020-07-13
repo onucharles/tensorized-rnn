@@ -25,10 +25,10 @@ class ActivGradLogger():
     def get_logs():
         """
         Returns a dictionary of activation and gradient averages across
-        different epochs and locations in the LSTM
+        different epochs and locations in the RNN
 
         The keys of the dictionary are pairs (variable, quantity), where 
-        variable denotes part of the LSTM state (e.g. 'hidden_1'), and 
+        variable denotes part of the RNN state (e.g. 'hidden_1'), and 
         quantity denotes a given average (e.g. 'log_grad'). These satisfy:
 
         variable in ['hidden_i', 'cell_i'], for i = 0,1,...,n_layers-1, and
@@ -108,15 +108,18 @@ class ActivGradLogger():
         of activation and gradient variables
         """
         @torch.no_grad()
-        def forward_hook(lstm_cell, inputs, outputs):
+        def forward_hook(rnn_cell, inputs, outputs):
             """
-            Returns a forward hook to be applied to a LSTMCell or TTLSTMCell
+            Returns a forward hook to be applied to an RNN cell
 
             These modules have type (input, hx, cx) -> (hy, cy), while the
             hook has type (module, input, output) -> None
             """
             # Get the average and average log of the value of interest
-            assert isinstance(outputs, tuple)
+            if not isinstance(outputs, tuple):
+                assert isinstance(outputs, torch.Tensor)
+                assert output_ind == 0
+                outputs = (outputs,)
             target = outputs[output_ind].detach()
             assert isinstance(target, torch.Tensor)
             av_act = av_norm(target)
