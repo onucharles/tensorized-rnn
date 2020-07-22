@@ -10,17 +10,19 @@ from tensorized_rnn.tt_lstm import TTLSTM
 
 class MNIST_Classifier(nn.Module):
     def __init__(self, input_size, output_size, hidden_size, num_layers, device,
-                 tt_lstm=True, n_cores=3, tt_rank=2):
+                 tt_lstm=True, n_cores=3, tt_rank=2, log_grads=False):
         super(MNIST_Classifier, self).__init__()
         self.tt_lstm = tt_lstm
 
         if tt_lstm:
             self.lstm = TTLSTM(input_size=input_size, hidden_size=hidden_size,
                                 num_layers=num_layers, device=device,
-                                n_cores=n_cores, tt_rank=tt_rank)
+                                n_cores=n_cores, tt_rank=tt_rank, 
+                                log_grads=log_grads)
         else:
             self.lstm = LSTM(input_size=input_size, hidden_size=hidden_size,
-                                num_layers=num_layers, device=device)
+                                num_layers=num_layers, device=device, 
+                                log_grads=log_grads)
         self.linear = nn.Linear(hidden_size, output_size)
 
     def forward(self, inputs):

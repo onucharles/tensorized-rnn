@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 
+from .grad_tools import ActivGradLogger
+
 
 class LSTMCell(nn.Module):
     def __init__(self, input_size, hidden_size, bias, device):
@@ -30,17 +32,26 @@ class LSTMCell(nn.Module):
         cy = (forgetgate * cx) + (ingate * cellgate)
         hy = outgate * torch.tanh(cy)
 
+        # Register gradient hooks if we have them
+        if hasattr(self, '_h_backward_hook') and hy.requires_grad:
+            assert hasattr(self, '_c_backward_hook')
+            assert cy.requires_grad
+            hy.register_hook(self._h_backward_hook)
+            cy.register_hook(self._c_backward_hook)
+
         return hy, cy
 
 
 class LSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, device, bias=True):
+    def __init__(self, input_size, hidden_size, num_layers, device, 
+                 bias=True, log_grads=False):
         super(LSTM, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.bias = bias
         self.device = device
+        self.log_grads = log_grads
 
         # instantiate lstm cell for each layer.
         self._all_layers = []
@@ -52,6 +63,22 @@ class LSTM(nn.Module):
                 cell = self._create_other_layer_cell()
             setattr(self, name, cell)
             self._all_layers.append(cell)
+
+        # Add logging for hidden state and cell state
+        if log_grads:
+            for i, cell in enumerate(self._all_layers):
+                # Hidden and cell state loggers
+                h_logger = ActivGradLogger(f"hidden_{i}")
+                c_logger = ActivGradLogger(f"cell_{i}")
+
+                # Set up hooks for the loggers. Backward hooks on modules
+                # don't work well, so using the Tensor-level backward hook
+                h_forward, h_backward = h_logger.create_hooks(0)
+                c_forward, c_backward = c_logger.create_hooks(1)
+                cell.register_forward_hook(h_forward)
+                cell.register_forward_hook(c_forward)
+                cell._h_backward_hook = h_backward
+                cell._c_backward_hook = c_backward
 
     def _create_first_layer_cell(self):
         return LSTMCell(self.input_size, self.hidden_size, self.bias, self.device)
