@@ -52,10 +52,16 @@ logger = CometLogger(not args.enable_logging, is_existing=False, prev_exp_key=No
 run_id = logger.get_experiment_key()
 logger.log_params(vars(args))
 
+if args.ttlstm:
+    logger.set_name('tt-n{}-h{}-ncores{}-rank{}'.format(args.n_layers,
+        args.hidden_size, args.ncores, args.ttrank))
+else:
+    logger.set_name('no-tt-n{}-h{}'.format(args.n_layers, args.hidden_size))
+
 torch.manual_seed(args.seed)
 if torch.cuda.is_available():
     # set default cuda device.
-    device = torch.device('cuda:0')
+    device = torch.device('cuda:1')
     torch.cuda.set_device(device)
 
     # warn if not using cuda and gpu is available.
@@ -108,7 +114,7 @@ def train(ep):
         train_correct += pred.eq(target.data.view_as(pred)).cpu().sum()
         train_loss += loss
         steps += 1
-        if batch_idx > 0 and batch_idx % args.log_interval == 0:
+        if batch_idx > 0 and (batch_idx + 1) % args.log_interval == 0:
             avg_train_loss = train_loss.item() / args.log_interval
             avg_train_acc = 100. * train_correct.item() / (args.log_interval * batch_size)
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAccuracy: ({:.2f}%)\tSteps: {}'.format(
@@ -119,10 +125,12 @@ def train(ep):
             train_loss = 0
             train_correct = 0
 
+best_test_acc = 0.0
 def test():
     model.eval()
     test_loss = 0
     correct = 0
+    global best_test_acc
     with torch.no_grad():
         for data, target in test_loader:
             if args.cuda:
@@ -141,6 +149,9 @@ def test():
         print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
             test_loss, correct, len(test_loader.dataset), test_acc))
         logger.log_metrics({"accuracy": test_acc, "loss": test_loss}, prefix="test", step=steps)
+        if test_acc - best_test_acc > 1e-6:
+            best_test_acc = test_acc
+            logger.log_metric("best_test_acc", best_test_acc, step=steps)
         return test_loss
 
 
