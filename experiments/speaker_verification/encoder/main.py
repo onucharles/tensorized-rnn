@@ -20,19 +20,19 @@ from encoder import config
 
 
 def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: int,
-          resume_experiment: bool, prev_exp_key: str, no_comet: bool, gpu_no: int,
+          resume_experiment: bool, prev_exp_key: str, enable_comet: bool, gpu_no: int,
           seed: int):
     """
     Main entry point for training.
     """
     # create comet logger.
-    logger = CometLogger(no_comet, is_existing=resume_experiment, prev_exp_key=prev_exp_key)
+    logger = CometLogger(enable_comet, is_existing=resume_experiment, prev_exp_key=prev_exp_key)
     run_id = logger.get_experiment_key()
 
     # log or load training parameters.
     train_data_dir, val_data_dir, params_fpath, state_fpath, umap_dir = \
         create_paths(clean_data_root, models_dir, run_id)
-    log_or_load_parameters(logger, resume_experiment, params_fpath, no_comet)
+    log_or_load_parameters(logger, resume_experiment, params_fpath, not enable_comet)
 
     # setup dataset and model.
     set_seed(seed)
@@ -81,7 +81,7 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
             print("Step: {} - Validation Average loss: {}\t\tAverage EER: {}".
                   format(step, avg_val_loss, avg_val_eer))
 
-            if no_comet: continue
+            if not enable_comet: continue
             if best_val_eer - avg_val_eer > 1e-4:  # save current model if improvement is significant
                 print("Saving the model (step %d)" % step)
                 torch.save({
@@ -260,7 +260,7 @@ def get_devices(gpu_no):
     loss_device = torch.device("cpu")
     return device, loss_device
 
-def log_or_load_parameters(logger, resume_experiment, params_fpath, no_logging=False):
+def log_or_load_parameters(logger, resume_experiment, params_fpath, no_logging=True):
     if resume_experiment:   # load parameters
         if not params_fpath.exists():
             raise FileNotFoundError("Cannot resume experiment. No parameters file '{}' found"

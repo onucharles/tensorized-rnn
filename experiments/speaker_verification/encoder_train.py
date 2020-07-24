@@ -9,22 +9,22 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("-d", "--clean_data_root", type=Path, help= \
-        "Path to the output directory of encoder_preprocess.py for training and validation sets.")
-    # parser.add_argument("--clean_data_root_val", type=Path, help= \
-    #     "Path to the output directory of encoder_preprocess.py for validation set.")
+        "Path to the output directory of encoder_preprocess.py for training and validation sets.",
+        default=r"..\..\..\_experiments\speech-model-compression\speaker-verification" )
     parser.add_argument("-m", "--models_dir", type=Path, help=\
         "Path to the output directory that will contain the saved model weights, as well as "
-        "backups of those weights and plots generated during training.")
-    parser.add_argument("-v", "--val_every", type=int, default=50, help= \
+        "backups of those weights and plots generated during training.",
+        default=r"..\..\..\_experiments\speech-model-compression\speaker-verification")
+    parser.add_argument("-v", "--val_every", type=int, default=10, help= \
         "Number of steps between updates of the loss and the plots.")
-    parser.add_argument("-u", "--umap_every", type=int, default=100, help= \
+    parser.add_argument("-u", "--umap_every", type=int, default=20, help= \
         "Number of steps between updates of the umap projection. Set to 0 to never update the "
         "projections.")
     parser.add_argument("-r", "--resume_experiment", action="store_true", help= \
         "Resume a saved experiment.")
     parser.add_argument("-k", "--prev_exp_key", type=str, default=None, help= \
         "The comet key of experiment to resume.")
-    parser.add_argument("--no_comet", action="store_true", help= \
+    parser.add_argument("--enable_comet", action="store_true", help= \
         "Disable logging to comet or file system.")
     parser.add_argument("--gpu_no", type=int, default=0, help =\
         "The index of GPU to use if multiple are available. If none, CPU will be used.")

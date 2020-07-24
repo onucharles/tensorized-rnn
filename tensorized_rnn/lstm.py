@@ -15,7 +15,7 @@ class LSTMCell(nn.Module):
         self.hidden_weights = self._create_hidden_hidden_weights()
 
     def _create_input_hidden_weights(self):
-        return nn.Linear(self.input_size, 4 * self.hidden_size, self.bias).to(self.device)
+        return nn.Linear(self.input_size, 4 * self.hidden_size, False).to(self.device)
 
     def _create_hidden_hidden_weights(self):
         return nn.Linear(self.hidden_size, 4 * self.hidden_size, self.bias).to(self.device)

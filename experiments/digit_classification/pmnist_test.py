@@ -8,7 +8,7 @@ import numpy as np
 import argparse
 from pathlib import Path
 
-from utils import data_generator
+from utils import data_generator, count_model_params
 from mnist_classifier import MNIST_Classifier
 
 
@@ -63,7 +63,7 @@ else:
 torch.manual_seed(args.seed)
 if torch.cuda.is_available():
     # set default cuda device.
-    device = torch.device('cuda:1')
+    device = torch.device('cuda:0')
     torch.cuda.set_device(device)
 
     # warn if not using cuda and gpu is available.
@@ -87,6 +87,9 @@ permute = torch.Tensor(np.random.permutation(784).astype(np.float64)).long()
 model = MNIST_Classifier(input_channels, n_classes, args.hidden_size, args.n_layers, device,
                          tt_lstm=args.ttlstm, n_cores=args.ncores, 
                          tt_rank=args.ttrank, log_grads=args.log_grads)
+n_trainable, n_nontrainable = count_model_params(model)
+print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"
+      .format(n_trainable, n_nontrainable, n_trainable + n_nontrainable))
 
 # Setup activation and gradient logging
 if args.log_grads:
@@ -134,6 +137,7 @@ def train(ep):
             train_loss = 0
             train_correct = 0
     if args.log_grads: AGL.end_epoch()
+
 
 
 best_test_acc = 0.0
