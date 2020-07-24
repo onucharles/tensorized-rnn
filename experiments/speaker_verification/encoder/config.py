@@ -1,6 +1,6 @@
 COMET_API_KEY = "w7QuiECYXbNiOozveTpjc9uPg"
-COMET_WORKSPACE = "onucharles"
-PROJECT_NAME = "speech-model-compression-customlstm"
+COMET_WORKSPACE = "tensorized-rnn"
+PROJECT_NAME = "speaker-verification"
 
 TRAIN_DATA_FOLDER = "_librispeech_train-clean-100_tisv"
 VAL_DATA_FOLDER = "_librispeech_dev-clean_tisv"
