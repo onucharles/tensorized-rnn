@@ -45,6 +45,9 @@ class CometLogger():
     def log_params(self, params_dict):
         self.experiment.log_parameters(params_dict)
 
+    def set_name(self, name_str):
+        self.experiment.set_name(name_str)
+
     def log_dataset(self, dataset: SpeakerVerificationDataset):
         if self.disabled:
             return
