@@ -15,8 +15,11 @@ __pycache__/
 # C extensions
 *.so
 
-# Annoying Mac auto-generated files
+# Mac auto-generated files
 *.DS_Store
+
+# Local savefiles for activation/gradient logging
+*.record
 
 # Distribution / packaging
 .Python

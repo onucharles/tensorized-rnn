@@ -1,8 +1,12 @@
+import pickle
+import warnings
+
 from comet_ml import Experiment, ExistingExperiment
 import matplotlib.pyplot as plt
 import numpy as np
 
-from config import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
+from config_j import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
+# from config import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
 
 class CometLogger():
     def __init__(self, disabled, is_existing=False, prev_exp_key=None):
@@ -26,6 +30,7 @@ class CometLogger():
                                                  disabled=disabled,
                                                  previous_experiment=prev_exp_key)
         self.disabled = disabled
+        self.name = None
 
     def get_experiment_key(self):
         return self.experiment.get_key()[:9]
@@ -44,6 +49,19 @@ class CometLogger():
 
     def set_name(self, name_str):
         self.experiment.set_name(name_str)
+        self.name = name_str
+
+    def save_act_grads(self, log_dict):
+        """Save a dictionary of activation/gradients records to disk"""
+        assert isinstance(log_dict, dict)
+        if self.name is None:
+            warnings.warn("Experiment name not set, not saving")
+            return
+
+        # Save the log dictionary
+        file_name = f"./.{self.name}.record"
+        with open(file_name, 'wb') as f:
+            pickle.dump(log_dict, f)
 
     # TODO: need to rewrite before can be used for MNIST.
     def draw_projections(self, embeds, utterances_per_speaker, step, out_fpath=None,
