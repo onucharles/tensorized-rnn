@@ -28,16 +28,18 @@ class GRUCell(nn.Module):
         # n_t = \tanh( W_{in} x_t + b_{in} + r_t * (W_{hn} h_{(t-1)} + b_{hn})) NEW
         # h_t = (1 - z_t) * n_t + z_t * h_{(t-1)}
 
-        # Apply the stacked weights, then separate out the outputs
+        # Apply the stacked weights
         input_part  = self.input_weights(input)
         hidden_part = self.hidden_weights(hx)
-        i_reset, i_update, i_new = input_part.chunk(3, 1)
-        h_reset, h_update, h_new = hidden_part.chunk(3, 1)
 
         # Update hidden state using the above rules
-        reset_gate  = torch.sigmoid(i_reset + h_reset)
-        update_gate = torch.sigmoid(i_update + h_update)
-        new_gate    = torch.tanh(i_new + reset_gate * h_new)
+        hsize = self.hidden_size
+        reset_gate  = torch.sigmoid(input_part[:, :hsize] + 
+                                    hidden_part[:, :hsize])
+        update_gate = torch.sigmoid(input_part[:, hsize:2*hsize] + 
+                                    hidden_part[:, hsize:2*hsize])
+        new_gate    = torch.tanh(input_part[:, 2*hsize:] + 
+                                 reset_gate * hidden_part[:, 2*hsize:])
         hy          = (1 - reset_gate) * new_gate + reset_gate * hx
 
         # Register gradient hooks if we have them

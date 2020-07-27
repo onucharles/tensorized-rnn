@@ -55,12 +55,14 @@ args = parser.parse_args()
 logger = CometLogger(not args.enable_logging, is_existing=False, prev_exp_key=None)
 run_id = logger.get_experiment_key()
 logger.log_params(vars(args))
+mod_name = 'gru' if args.gru else 'lstm'
 
-if args.ttlstm:
-    logger.set_name('tt-n{}-h{}-ncores{}-rank{}'.format(args.n_layers,
-        args.hidden_size, args.ncores, args.ttrank))
+if args.tt:
+    logger.set_name('{}-tt-n{}-h{}-ncores{}-rank{}'.format(mod_name, 
+        args.n_layers, args.hidden_size, args.ncores, args.ttrank))
 else:
-    logger.set_name('no-tt-n{}-h{}'.format(args.n_layers, args.hidden_size))
+    logger.set_name('{}-no-tt-n{}-h{}'.format(mod_name, args.n_layers, 
+        args.hidden_size))
 
 torch.manual_seed(args.seed)
 if torch.cuda.is_available():
@@ -178,9 +180,10 @@ if __name__ == "__main__":
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
 
-        # # Example of how logs can be accessed, with the average of the 
-        # # log activation in the layer 1 (second layer) cell state selected
-        # log_dict = AGL.get_logs()
-        # logact_averages = log_dict[('cell_1', 'log_act')]
-        # # Watch how the shape changes after each epoch
-        # print(logact_averages.shape)
+        # Example of how logs can be accessed, with the average of the 
+        # log activation in the layer 1 (second layer) cell state selected
+        if args.log_grads:
+            log_dict = AGL.get_logs()
+            logact_averages = log_dict[('cell_0', 'log_act')]
+            # Watch how the shape changes after each epoch
+            print(logact_averages.shape)
