@@ -2,7 +2,7 @@ from collections import deque
 
 import torch
 
-from t3nsor.tensor_train import TensorTrainBatch
+from t3nsor.tensor_train import TensorTrain, TensorTrainBatch
 """
 ## NOTE ON TT FORMATTING
 
@@ -274,3 +274,15 @@ def project_ttgrad(base_tt, grad_tt):
 #     print(grad_mats[0]) # First global grad matrix in batch
 #     # Grad entries are 105 = 35 * 3 (product of all TT ranks and 
 #     #                                number of cores defining TT matrix)
+
+def param_count(matrix):
+    """Count the number of weights in a matrix or TT matrix"""
+    assert isinstance(matrix, torch.nn.Module)
+    total = 0
+    for param in matrix.parameters():
+        num = param.shape
+        total += num.numel()
+    if isinstance(matrix, TensorTrain):
+        assert total == matrix.dof
+    
+    return total

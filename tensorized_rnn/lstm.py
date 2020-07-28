@@ -2,6 +2,7 @@ import torch
 from torch import nn
 
 from .grad_tools import ActivGradLogger
+from .grad_tools import param_count as pc
 
 
 class LSTMCell(nn.Module):
@@ -90,6 +91,14 @@ class LSTM(nn.Module):
         h = torch.zeros(batch_size, self.hidden_size).to(self.device)
         c = torch.zeros(batch_size, self.hidden_size).to(self.device)
         return h, c
+
+    def param_count(self):
+        # input_weights and hidden_weights
+        total = 0
+        for cell in self._all_layers:
+            for attr in ('input_weights', 'hidden_weights'):
+                total += pc(getattr(cell, attr))
+        return total
 
     def forward(self, input, init_states=None):
         """

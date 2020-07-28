@@ -6,6 +6,7 @@ from context import tensorized_rnn
 from tensorized_rnn.lstm import LSTM
 from tensorized_rnn.tt_lstm import TTLSTM
 from tensorized_rnn.gru import GRU, TTGRU
+from tensorized_rnn.grad_tools import param_count as pc
 
 
 class MNIST_Classifier(nn.Module):
@@ -34,6 +35,9 @@ class MNIST_Classifier(nn.Module):
                                 log_grads=log_grads)
         
         self.linear = nn.Linear(hidden_size, output_size)
+
+    def param_count(self):
+        return self.rnn.param_count() + pc(self.linear)
 
     def forward(self, inputs):
         if self.gru:

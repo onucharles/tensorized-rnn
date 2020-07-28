@@ -3,6 +3,7 @@ from torch import nn
 from t3nsor.layers import TTLinear
 
 from .grad_tools import ActivGradLogger
+from .grad_tools import param_count as pc
 
 
 class GRUCell(nn.Module):
@@ -92,6 +93,13 @@ class GRU(nn.Module):
     def init_hidden(self, batch_size):
         h = torch.zeros(batch_size, self.hidden_size).to(self.device)
         return h
+
+    def param_count(self):
+        total = 0
+        for cell in self._all_layers:
+            for attr in ('input_weights', 'hidden_weights'):
+                total += pc(getattr(cell, attr))
+        return total
 
     def forward(self, input, init_states=None):
         """
