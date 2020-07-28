@@ -30,8 +30,8 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
     run_id = logger.get_experiment_key()
 
     # log or load training parameters.
-    train_data_dir, val_data_dir, params_fpath, state_fpath, umap_dir = \
-        create_paths(clean_data_root, models_dir, run_id)
+    train_data_dir, val_data_dir, test_data_dir, params_fpath, state_fpath, umap_dir = \
+        create_paths(clean_data_root, models_dir, run_id, enable_comet)
     log_or_load_parameters(logger, resume_experiment, params_fpath, not enable_comet)
 
     # setup dataset and model.
@@ -77,7 +77,7 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
         optimizer.step()
 
         logger.log_metrics({"EER": eer, "loss": loss.item()}, prefix="train", step=step)
-        # print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
+        print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
 
         if val_every != 0 and step % val_every == 0:
             avg_val_loss, avg_val_eer = evaluate(val_loader, model, pm.val_speakers_per_batch,
@@ -106,13 +106,15 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
             logger.draw_projections(embeds, pm.utterances_per_speaker, step, projection_fpath)
 
 
-def test(test_data_dir: Path, exp_root_dir: Path, prev_exp_key: str,
-         no_comet: bool, gpu_no: int):
+def test(clean_data_root: Path, exp_root_dir: Path, prev_exp_key: str,
+         enable_comet: bool, gpu_no: int):
     """
     Main entry point for testing.
     """
-    logger = CometLogger(no_comet, is_existing=True, prev_exp_key=prev_exp_key)
+    logger = CometLogger(enable_comet, is_existing=True, prev_exp_key=prev_exp_key)
     run_id = logger.get_experiment_key()
+    _, dev_data_dir, test_data_dir, params_fpath, state_fpath, umap_dir = \
+        create_paths(clean_data_root, exp_root_dir, run_id, enable_comet)
 
     # create loader.
     speakers_per_batch = pm.test_speakers_per_batch
@@ -123,12 +125,12 @@ def test(test_data_dir: Path, exp_root_dir: Path, prev_exp_key: str,
                                      utterances_per_speaker, pd.partials_n_frames)
 
     # initialise and load model
-    params_fpath, state_fpath, _ = create_paths(exp_root_dir, run_id)
     log_or_load_parameters(logger, resume_experiment=True, params_fpath=params_fpath)
     device, loss_device = get_devices(gpu_no)
     model = SpeakerEncoder(pd.mel_n_channels, pm.model_hidden_size, pm.model_num_layers,
-                           pm.model_embedding_size, device, loss_device, use_low_rank=pm.use_low_rank,
-                           use_tt=pm.use_tt, n_cores=pm.n_cores, rank=pm.rank)
+                           pm.model_embedding_size, device, loss_device,
+                           compression=pm.compression, n_cores=pm.n_cores,
+                           rank=pm.rank)
     if state_fpath.exists():
         print("Found existing model \"%s\", loading it." % state_fpath)
         checkpoint = torch.load(state_fpath)
@@ -207,19 +209,20 @@ def create_test_loader(clean_data_root, speakers_per_batch, utterances_per_speak
     return test_loader
 
 
-def create_paths(data_dir, models_dir, run_id, no_logging=False):
+def create_paths(data_dir, models_dir, run_id, enable_logging=False):
     train_data_dir = data_dir / config.TRAIN_DATA_FOLDER
     val_data_dir = data_dir / config.VAL_DATA_FOLDER
+    test_data_dir = data_dir / config.TEST_DATA_FOLDER
     exp_dir = models_dir / run_id
     umap_dir = exp_dir / "umap_pngs"
 
-    if not no_logging:
+    if enable_logging:
         exp_dir.mkdir(exist_ok=True)
         umap_dir.mkdir(exist_ok=True)
 
     params_fpath = exp_dir / "params.txt"
     state_fpath = exp_dir / "model.pt"
-    return train_data_dir, val_data_dir, params_fpath, state_fpath, umap_dir
+    return train_data_dir, val_data_dir, test_data_dir, params_fpath, state_fpath, umap_dir
 
 
 def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id):
