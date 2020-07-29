@@ -83,15 +83,17 @@ else:
 root = './data/mnist'
 batch_size = args.batch_size
 n_classes = 10
-input_channels = 28
-seq_length = int(784 / input_channels)
 epochs = args.epochs
 steps = 0
+if args.permute:    # each pixel is input for a time step.
+    input_channels = 1
+else:               # each row(of pixels) is input for a time step.
+    input_channels = 28
+seq_length = int(784 / input_channels)
 
 print(args)
 train_loader, test_loader = data_generator(root, batch_size)
 
-permute = torch.Tensor(np.random.permutation(784).astype(np.float64)).long()
 model = MNIST_Classifier(input_channels, n_classes, args.hidden_size, args.n_layers, device,
                          tt=args.tt, gru=args.gru, n_cores=args.ncores, 
                          tt_rank=args.ttrank, log_grads=args.log_grads)
@@ -103,6 +105,7 @@ print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total
 if args.log_grads:
     from tensorized_rnn.grad_tools import ActivGradLogger as AGL
 
+permute = torch.Tensor(np.random.permutation(784).astype(np.float64)).long()
 if args.cuda:
     model.cuda()
     permute = permute.cuda()
@@ -113,6 +116,8 @@ optimizer = getattr(optim, args.optim)(model.parameters(), lr=lr)
 if args.lr_scheduler:
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10)
 
+print(f"input channels: {input_channels}; seq_length: {seq_length}; cuda: {args.cuda}")
+# exit()
 def train(ep):
     global steps
     train_loss = 0
@@ -122,7 +127,7 @@ def train(ep):
         if args.cuda: data, target = data.cuda(), target.cuda()
         data = data.view(-1, seq_length, input_channels)
         if args.permute:
-            data = data[:, :, permute]
+            data = data[:, permute, :]
         data, target = Variable(data), Variable(target)
         optimizer.zero_grad()
         output = model(data)
