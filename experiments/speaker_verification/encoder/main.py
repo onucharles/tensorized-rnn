@@ -53,7 +53,7 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
         logger.add_tag("low-rank{}".format(pm.rank))
     elif pm.compression is None:
         logger.set_name('tt-n{}-h{}'.format(pm.model_num_layers,
-            pm.model_hidden_size)
+            pm.model_hidden_size))
         logger.add_tag("no-comp")
     else:
         raise ValueError('Unknown compression value: "{}"'.format(pm.compression))
