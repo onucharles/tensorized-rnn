@@ -1,12 +1,13 @@
+from time import time
 from comet_logger import CometLogger
 
 import torch
-from torch.autograd import Variable
+import argparse
+import numpy as np
 import torch.optim as optim
 import torch.nn.functional as F
-import numpy as np
-import argparse
 from pathlib import Path
+from torch.autograd import Variable
 
 from utils import data_generator, count_model_params
 from mnist_classifier import MNIST_Classifier
@@ -17,48 +18,55 @@ parser.add_argument('--batch_size', type=int, default=128, metavar='N',
                     help='batch size (default: 128)')
 parser.add_argument('--cuda', action='store_false',
                     help='use CUDA (default: True)')
-parser.add_argument('--ttlstm', action='store_true',
-                    help='use tensorized LSTM (default: False)')
+parser.add_argument('--tt', action='store_true',
+                    help='use tensorized RNN model (default: False)')
+parser.add_argument('--gru', action='store_true',
+                    help='use GRU instead of LSTM (default: False)')
 parser.add_argument('--clip', type=float, default=-1,
                     help='gradient clip, -1 means no clip (default: -1)')
 parser.add_argument('--epochs', type=int, default=20,
                     help='upper epoch limit (default: 20)')
-parser.add_argument('--n_layers', type=int, default=2,
-                    help='# of layers (default: 2)')
-parser.add_argument('--log-interval', type=int, default=100, metavar='N',
+parser.add_argument('--n_layers', type=int, default=1,
+                    help='# of layers (default: 1)')
+parser.add_argument('--log_interval', type=int, default=100, metavar='N',
                     help='report interval (default: 100')
-parser.add_argument('--lr', type=float, default=2e-3,
-                    help='initial learning rate (default: 2e-3)')
+parser.add_argument('--lr', type=float, default=1e-2,
+                    help='initial learning rate (default: 1e-2)')
 parser.add_argument('--optim', type=str, default='Adam',
                     help='optimizer to use (default: Adam)')
-parser.add_argument('--hidden_size', type=int, default=32,
-                    help='number of hidden units per layer (default: 32)')
+parser.add_argument('--lr_scheduler', action='store_false',
+                    help='Whether to use piecewise-constant LR scheduler '
+                         '(default: True)')
+parser.add_argument('--hidden_size', type=int, default=256,
+                    help='number of hidden units per layer (default: 256)')
 parser.add_argument('--seed', type=int, default=1111,
                     help='random seed (default: 1111)')
 parser.add_argument('--permute', action='store_true',
                     help='use permuted MNIST (default: False)')
-parser.add_argument('--ncores', type=int, default=3,
-                    help='number of TT cores (default: 3)')
+parser.add_argument('--ncores', type=int, default=2,
+                    help='number of TT cores (default: 2)')
 parser.add_argument('--ttrank', type=int, default=2,
                     help='TT rank (default: 2)')
 parser.add_argument('--enable_logging', action='store_true',
                     help='Log metrics to Comet and save model to disk (default: False)')
-parser.add_argument('--models_dir', type=str, help='Path to saved model files.')
 parser.add_argument('--log_grads', action='store_true',
                     help='Whether to log gradients and activations (default: False)')
+# parser.add_argument('--models_dir', type=str, help='Path to saved model files.')
 
 args = parser.parse_args()
+if not args.tt:
+    args.ncores = 1
+    args.ttrank = 1
 
 # create comet logger.
-logger = CometLogger(not args.enable_logging, is_existing=False, prev_exp_key=None)
-run_id = logger.get_experiment_key()
-logger.log_params(vars(args))
+logger = CometLogger(not args.enable_logging)
+# run_id = logger.get_experiment_key()
+mod_name = 'gru' if args.gru else 'lstm'
 
-if args.ttlstm:
-    logger.set_name('tt-n{}-h{}-ncores{}-rank{}'.format(args.n_layers,
-        args.hidden_size, args.ncores, args.ttrank))
-else:
-    logger.set_name('no-tt-n{}-h{}'.format(args.n_layers, args.hidden_size))
+logger.log_params(vars(args))
+name = (f"{mod_name}-{'tt' if args.tt else 'no-tt'}-n{args.n_layers}"
+        f"-h{args.hidden_size}-ncores{args.ncores}-rank{args.ttrank}")
+logger.set_name(name)
 
 torch.manual_seed(args.seed)
 if torch.cuda.is_available():
@@ -85,7 +93,7 @@ train_loader, test_loader = data_generator(root, batch_size)
 
 permute = torch.Tensor(np.random.permutation(784).astype(np.float64)).long()
 model = MNIST_Classifier(input_channels, n_classes, args.hidden_size, args.n_layers, device,
-                         tt_lstm=args.ttlstm, n_cores=args.ncores, 
+                         tt=args.tt, gru=args.gru, n_cores=args.ncores, 
                          tt_rank=args.ttrank, log_grads=args.log_grads)
 n_trainable, n_nontrainable = count_model_params(model)
 print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"
@@ -99,8 +107,11 @@ if args.cuda:
     model.cuda()
     permute = permute.cuda()
 
+# Set learning rate, optimizer, scheduler
 lr = args.lr
 optimizer = getattr(optim, args.optim)(model.parameters(), lr=lr)
+if args.lr_scheduler:
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10)
 
 def train(ep):
     global steps
@@ -172,17 +183,19 @@ def test():
 
 
 if __name__ == "__main__":
+    import os.path
+    from tensorized_rnn.grad_tools import ActivGradLogger as AGL
+    start = time()
+
     for epoch in range(1, epochs+1):
         train(epoch)
         test()
-        if epoch % 10 == 0:
-            lr /= 10
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = lr
+        if args.lr_scheduler: scheduler.step()
 
-        # # Example of how logs can be accessed, with the average of the 
-        # # log activation in the layer 1 (second layer) cell state selected
-        # log_dict = AGL.get_logs()
-        # logact_averages = log_dict[('cell_1', 'log_act')]
-        # # Watch how the shape changes after each epoch
-        # print(logact_averages.shape)
+        logger.save_act_grads(AGL.get_logs())
+        assert os.path.isfile(f"./.{name}.record")
+        print(f"Runtime: {time() - start:.0f} sec\n")
+        # if epoch % 10 == 0:
+            # lr /= 10
+            # for param_group in optimizer.param_groups:
+            #     param_group['lr'] = lr
