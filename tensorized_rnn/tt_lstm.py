@@ -12,7 +12,7 @@ class TTLSTMCell(LSTMCell):
     def _create_input_hidden_weights(self):
         return TTLinear(in_features=self.input_size, 
                         out_features=4 * self.hidden_size,
-                        bias=self.bias, auto_shapes=True, 
+                        bias=False, auto_shapes=True,
                         d=self.n_cores, tt_rank=self.tt_rank).to(self.device)
 
     def _create_hidden_hidden_weights(self):

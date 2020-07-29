@@ -7,11 +7,12 @@ from encoder.data_objects.speaker_verification_dataset import SpeakerVerificatio
 from .config import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
 
 class CometLogger():
-    def __init__(self, disabled, is_existing=False, prev_exp_key=None):
+    def __init__(self, enabled, is_existing=False, prev_exp_key=None):
         """
         Handles logging of experiment to comet and also persistence to local file system.
         Supports resumption of stopped experiments.
         """
+        disabled = not enabled
 
         if not is_existing:
             self.experiment = Experiment(api_key=COMET_API_KEY,
@@ -43,6 +44,9 @@ class CometLogger():
 
     def log_params(self, params_dict):
         self.experiment.log_parameters(params_dict)
+
+    def set_name(self, name_str):
+        self.experiment.set_name(name_str)
 
     def log_dataset(self, dataset: SpeakerVerificationDataset):
         if self.disabled:
