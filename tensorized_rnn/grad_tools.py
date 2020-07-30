@@ -1,3 +1,5 @@
+import pickle
+import os.path
 from collections import deque
 
 import torch
@@ -198,11 +200,10 @@ def av_norm(tensor, average_logs=False):
     with batch index assumed to be zeroth index
     """
     num_inds = len(tensor.shape)
-    norms = (tensor ** 2).sum(list(range(1, num_inds)))
+    norms = torch.sqrt((tensor ** 2).sum(list(range(1, num_inds))))
     if average_logs: norms = torch.log(norms)
     assert len(norms.shape) == 1
     return norms.mean()
-
 
 
 def project_ttgrad(base_tt, grad_tt):
@@ -274,6 +275,17 @@ def project_ttgrad(base_tt, grad_tt):
 #     print(grad_mats[0]) # First global grad matrix in batch
 #     # Grad entries are 105 = 35 * 3 (product of all TT ranks and 
 #     #                                number of cores defining TT matrix)
+
+def get_data(save_file, quantity='act', is_cell=False, layer_num=0):
+    """
+    Pull some activation or gradient data from saved record
+    """
+    assert os.path.isfile(save_file)
+    assert quantity in ['act', 'log_act', 'grad', 'log_grad']
+    log_dict = pickle.load(open(save_file, 'rb'))
+    key = (f"{'cell' if is_cell else 'hidden'}_{layer_num}", quantity)
+
+    return log_dict[key]
 
 def param_count(matrix):
     """Count the number of weights in a matrix or TT matrix"""
