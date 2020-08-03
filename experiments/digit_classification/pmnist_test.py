@@ -24,27 +24,29 @@ parser.add_argument('--gru', action='store_true',
                     help='use GRU instead of LSTM (default: False)')
 parser.add_argument('--clip', type=float, default=-1,
                     help='gradient clip, -1 means no clip (default: -1)')
-parser.add_argument('--epochs', type=int, default=20,
-                    help='upper epoch limit (default: 20)')
+parser.add_argument('--epochs', type=int, default=30,
+                    help='upper epoch limit (default: 30)')
 parser.add_argument('--n_layers', type=int, default=1,
                     help='# of layers (default: 1)')
 parser.add_argument('--log_interval', type=int, default=100, metavar='N',
                     help='report interval (default: 100')
-parser.add_argument('--lr', type=float, default=1e-2,
-                    help='initial learning rate (default: 1e-2)')
+parser.add_argument('--lr', type=float, default=5e-3,
+                    help='initial learning rate (default: 5e-3)')
 parser.add_argument('--optim', type=str, default='Adam',
                     help='optimizer to use (default: Adam)')
 parser.add_argument('--lr_scheduler', action='store_false',
                     help='Whether to use piecewise-constant LR scheduler '
                          '(default: True)')
+parser.add_argument('--num_plateau', type=int, default=3,
+                    help='Number of plateaus for LR scheduler (default: 3)')
 parser.add_argument('--hidden_size', type=int, default=256,
                     help='number of hidden units per layer (default: 256)')
 parser.add_argument('--seed', type=int, default=1111,
                     help='random seed (default: 1111)')
 parser.add_argument('--permute', action='store_true',
                     help='use permuted MNIST (default: False)')
-parser.add_argument('--ncores', type=int, default=2,
-                    help='number of TT cores (default: 2)')
+parser.add_argument('--ncores', type=int, default=4,
+                    help='number of TT cores (default: 4)')
 parser.add_argument('--ttrank', type=int, default=2,
                     help='TT rank (default: 2)')
 parser.add_argument('--enable_logging', action='store_true',
@@ -98,6 +100,9 @@ model = MNIST_Classifier(input_channels, n_classes, args.hidden_size, args.n_lay
 n_trainable, n_nontrainable = count_model_params(model)
 print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"
       .format(n_trainable, n_nontrainable, n_trainable + n_nontrainable))
+n_params = model.param_count()
+assert n_params == (n_trainable + n_nontrainable)
+logger.log_param('param_count', n_params)
 
 # Setup activation and gradient logging
 if args.log_grads:
@@ -111,7 +116,8 @@ if args.cuda:
 lr = args.lr
 optimizer = getattr(optim, args.optim)(model.parameters(), lr=lr)
 if args.lr_scheduler:
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 
+                    step_size=round(args.epochs / args.num_plateau))
 
 def train(ep):
     global steps

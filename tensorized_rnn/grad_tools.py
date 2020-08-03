@@ -284,8 +284,13 @@ def get_data(save_file, quantity='act', is_cell=False, layer_num=0):
     assert quantity in ['act', 'log_act', 'grad', 'log_grad']
     log_dict = pickle.load(open(save_file, 'rb'))
     key = (f"{'cell' if is_cell else 'hidden'}_{layer_num}", quantity)
+    data_mat = log_dict[key]
 
-    return log_dict[key]
+    # Convert natural log to log base 10
+    if quantity in ['log_act', 'log_grad']:
+        data_mat /= (torch.log(torch.tensor(10.)))
+
+    return data_mat
 
 def param_count(matrix):
     """Count the number of weights in a matrix or TT matrix"""

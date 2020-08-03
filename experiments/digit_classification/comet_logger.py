@@ -47,6 +47,9 @@ class CometLogger():
     def log_params(self, params_dict):
         self.experiment.log_parameters(params_dict)
 
+    def log_param(self, param_name, value):
+        self.experiment.log_parameter(param_name, value)
+
     def set_name(self, name_str):
         self.experiment.set_name(name_str)
         self.name = name_str
