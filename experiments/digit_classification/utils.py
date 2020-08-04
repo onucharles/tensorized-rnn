@@ -14,8 +14,10 @@ def data_generator(root, batch_size):
                                   transforms.Normalize((0.1307,), (0.3081,))
                               ]))
 
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
+                        num_workers=12)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size,
+                        num_workers=12)
     return train_loader, test_loader
 
 

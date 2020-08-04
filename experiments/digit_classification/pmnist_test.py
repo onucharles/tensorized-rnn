@@ -51,6 +51,8 @@ parser.add_argument('--enable_logging', action='store_true',
                     help='Log metrics to Comet and save model to disk (default: False)')
 parser.add_argument('--log_grads', action='store_true',
                     help='Whether to log gradients and activations (default: False)')
+parser.add_argument("--gpu_no", type=int, default=0, help =\
+                "The index of GPU to use if multiple are available. If none, CPU will be used.")
 # parser.add_argument('--models_dir', type=str, help='Path to saved model files.')
 
 args = parser.parse_args()
@@ -68,10 +70,15 @@ name = (f"{mod_name}-{'tt' if args.tt else 'no-tt'}-n{args.n_layers}"
         f"-h{args.hidden_size}-ncores{args.ncores}-rank{args.ttrank}")
 logger.set_name(name)
 
+# fix seeds
 torch.manual_seed(args.seed)
+torch.cuda.manual_seed(args.seed)
+np.random.seed(args.seed)
+
+# Set cuda device
 if torch.cuda.is_available():
     # set default cuda device.
-    device = torch.device('cuda:0')
+    device = torch.device('cuda:{}'.format(args.gpu_no))
     torch.cuda.set_device(device)
 
     # warn if not using cuda and gpu is available.
@@ -116,7 +123,7 @@ optimizer = getattr(optim, args.optim)(model.parameters(), lr=lr)
 if args.lr_scheduler:
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10)
 
-print(f"input channels: {input_channels}; seq_length: {seq_length}; cuda: {args.cuda}")
+# print(f"input channels: {input_channels}; seq_length: {seq_length}; cuda: {args.cuda}")
 # exit()
 def train(ep):
     global steps
@@ -141,6 +148,7 @@ def train(ep):
         pred = output.data.max(1, keepdim=True)[1]
         train_correct += pred.eq(target.data.view_as(pred)).cpu().sum()
         train_loss += loss
+        # print(f"step: {steps}; loss: {loss}")
         steps += 1
         if batch_idx > 0 and (batch_idx + 1) % args.log_interval == 0:
             avg_train_loss = train_loss.item() / args.log_interval
@@ -168,7 +176,7 @@ def test():
                 data, target = data.cuda(), target.cuda()
             data = data.view(-1, seq_length, input_channels)
             if args.permute:
-                data = data[:, :, permute]
+                data = data[:, permute, :]
             data, target = Variable(data), Variable(target)
             output = model(data)
             test_loss += F.nll_loss(output, target, size_average=False).item()
