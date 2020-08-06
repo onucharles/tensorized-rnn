@@ -7,6 +7,7 @@ import argparse
 from time import time
 import numpy as np
 from mnist_classifier import MNIST_Classifier
+from GPUtil import showUtilization as gpu_usage
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -50,6 +51,7 @@ if __name__ == '__main__':
             # time forward pass
             start = time()
             out = model(random_batch)
+            gpu_usage()
             duration = time() - start
 
             # save duration

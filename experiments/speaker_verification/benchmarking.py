@@ -7,6 +7,7 @@ import argparse
 from time import time
 import numpy as np
 from encoder.speaker_encoder import SpeakerEncoder
+from GPUtil import showUtilization as gpu_usage
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -38,6 +39,7 @@ if __name__ == '__main__':
         for i in np.arange(args.n_runs):
             start = time()
             out = model(random_batch)
+            gpu_usage()
             duration = time() - start
             print(f"Run: {i} \t Duration: {duration}", )
             all_durations.append(duration)
