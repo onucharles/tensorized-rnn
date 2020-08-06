@@ -44,7 +44,7 @@ class SpeakerEncoder(nn.Module):
                                    bias=True, auto_shapes=True, d=n_cores, tt_rank=rank).to(device)
         else:
             raise ValueError("Unknown compression type: '{}'".format(compression))
-        print("Number of parameters in last layer: ", count_model_params(self.linear))
+        # print("Number of parameters in last layer: ", count_model_params(self.linear))
 
         self.relu = torch.nn.ReLU().to(device)
         
