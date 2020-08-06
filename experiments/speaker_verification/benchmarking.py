@@ -1,3 +1,7 @@
+"""
+Benchmarking runtime of speaker verfication models.
+"""
+
 import torch
 import argparse
 from time import time
@@ -5,10 +9,7 @@ import numpy as np
 from encoder.speaker_encoder import SpeakerEncoder
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description="Trains the speaker encoder. You must have run encoder_preprocess.py first.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
+    parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--compression", type=str, default=None)
     parser.add_argument("--n_cores", type=int, default=1)
     parser.add_argument("--rank", type=int, default=1)
@@ -26,7 +27,8 @@ if __name__ == '__main__':
     # create random batch of data (using appropriate sizes)
     random_batch = np.random.rand(16 * 32, 160, 40).astype('float32')
     random_batch = torch.from_numpy(random_batch).to(device)
-    print("Benchmarking with random input of shape: ", random_batch.shape)
+    print("Benchmarking with input of shape (n_speakers * n_utterances, seq_length, input_channels): ",
+          random_batch.shape)
 
     # run and time forward pass x times.
     model.eval()
