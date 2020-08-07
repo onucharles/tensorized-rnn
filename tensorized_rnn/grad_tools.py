@@ -257,25 +257,6 @@ def project_ttgrad(base_tt, grad_tt):
     # Convert to TensorTrainBatch and use full() method to get global mats
     return TensorTrainBatch(local_tt).full()
 
-
-
-# ## Below gives an example usage of project_ttgrad
-# if __name__ == '__main__':
-#     # Batch size of 10, three cores with TT ranks 5 and 7, 
-#     # all three core mat dims are 2, which gives an 8x8 global mat
-#     shapes = [[10, 1, 2, 2, 5], [10, 5, 2, 2, 7], [10, 7, 2, 2, 1]]
-#     # Cores are chosen as all-ones tensors
-#     base_cores = grad_cores = [torch.ones(*s) for s in shapes]
-#     base_tt = TensorTrainBatch(base_cores)
-#     grad_tt = TensorTrainBatch(grad_cores)
-
-#     # Project gradient TT cores at base TT matrix to get global gradients
-#     grad_mats = project_ttgrad(base_tt, grad_tt)
-
-#     print(grad_mats[0]) # First global grad matrix in batch
-#     # Grad entries are 105 = 35 * 3 (product of all TT ranks and 
-#     #                                number of cores defining TT matrix)
-
 def get_data(save_file, quantity='act', is_cell=False, layer_num=0):
     """
     Pull some activation or gradient data from saved record
