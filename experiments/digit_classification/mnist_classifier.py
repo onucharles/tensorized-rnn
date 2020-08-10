@@ -7,6 +7,7 @@ from tensorized_rnn.lstm import LSTM
 from tensorized_rnn.tt_lstm import TTLSTM
 from tensorized_rnn.gru import GRU, TTGRU
 from tensorized_rnn.grad_tools import param_count as pc
+from t3nsor.layers import TTLinear
 
 
 class MNIST_Classifier(nn.Module):
@@ -15,26 +16,30 @@ class MNIST_Classifier(nn.Module):
         super(MNIST_Classifier, self).__init__()
         self.gru = gru
 
-        if tt and not gru:
-            self.rnn = TTLSTM(input_size=input_size, hidden_size=hidden_size,
+        if tt:
+            if not gru:
+                self.rnn = TTLSTM(input_size=input_size, hidden_size=hidden_size,
                                 num_layers=num_layers, device=device,
                                 n_cores=n_cores, tt_rank=tt_rank, 
                                 log_grads=log_grads)
-        elif not tt and not gru:
-            self.rnn = LSTM(input_size=input_size, hidden_size=hidden_size,
-                                num_layers=num_layers, device=device, 
-                                log_grads=log_grads)
-        elif tt and gru:
-            self.rnn = TTGRU(input_size=input_size, hidden_size=hidden_size,
+            else:
+                self.rnn = TTGRU(input_size=input_size, hidden_size=hidden_size,
                                 num_layers=num_layers, device=device,
                                 n_cores=n_cores, tt_rank=tt_rank, 
                                 log_grads=log_grads)
-        elif not tt and gru:
-            self.rnn = GRU(input_size=input_size, hidden_size=hidden_size,
+            self.linear = TTLinear(in_features=hidden_size, 
+                    out_features=output_size, bias=True, 
+                    auto_shapes=True, d=n_cores, tt_rank=tt_rank)
+        else:
+            if not gru:
+                self.rnn = LSTM(input_size=input_size, hidden_size=hidden_size,
                                 num_layers=num_layers, device=device, 
                                 log_grads=log_grads)
-        
-        self.linear = nn.Linear(hidden_size, output_size)
+            else:
+                self.rnn = GRU(input_size=input_size, hidden_size=hidden_size,
+                                num_layers=num_layers, device=device, 
+                                log_grads=log_grads)
+            self.linear = nn.Linear(hidden_size, output_size)
 
     def param_count(self):
         return self.rnn.param_count() + pc(self.linear)
