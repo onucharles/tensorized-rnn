@@ -62,13 +62,17 @@ if not args.tt:
 
 # create comet logger.
 logger = CometLogger(not args.enable_logging)
-# run_id = logger.get_experiment_key()
+run_id = logger.get_experiment_key()
 mod_name = 'gru' if args.gru else 'lstm'
-
 logger.log_params(vars(args))
 name = (f"{mod_name}-{'tt' if args.tt else 'no-tt'}-n{args.n_layers}"
         f"-h{args.hidden_size}-ncores{args.ncores}-rank{args.ttrank}")
 logger.set_name(name)
+
+# saved model path
+model_dir = Path("saved_models") / run_id
+model_dir.mkdir(exist_ok=True)
+model_path = model_dir / "model.pt"
 
 # fix seeds
 torch.manual_seed(args.seed)
@@ -99,7 +103,7 @@ else:               # each row(of pixels) is input for a time step.
 seq_length = int(784 / input_channels)
 
 print(args)
-train_loader, test_loader = data_generator(root, batch_size)
+train_loader, val_loader, test_loader = data_generator(root, batch_size)
 
 model = MNIST_Classifier(input_channels, n_classes, args.hidden_size, args.n_layers, device,
                          tt=args.tt, gru=args.gru, n_cores=args.ncores, 
@@ -165,33 +169,39 @@ def train(ep):
 
 
 best_test_acc = 0.0
-def test():
-    model.eval()
+def test(test_model, loader, val_or_test="val"):
+    test_model.eval()
     test_loss = 0
     correct = 0
     global best_test_acc
     with torch.no_grad():
-        for data, target in test_loader:
+        for data, target in loader:
             if args.cuda:
                 data, target = data.cuda(), target.cuda()
             data = data.view(-1, seq_length, input_channels)
             if args.permute:
                 data = data[:, permute, :]
             data, target = Variable(data), Variable(target)
-            output = model(data)
+            output = test_model(data)
             test_loss += F.nll_loss(output, target, size_average=False).item()
             pred = output.data.max(1, keepdim=True)[1]
             correct += pred.eq(target.data.view_as(pred)).cpu().sum()
             if args.log_grads: AGL.del_record()
 
-        test_loss /= len(test_loader.dataset)
-        test_acc = 100. * correct / len(test_loader.dataset)
-        print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
-            test_loss, correct, len(test_loader.dataset), test_acc))
-        logger.log_metrics({"accuracy": test_acc, "loss": test_loss}, prefix="test", step=steps)
-        if test_acc - best_test_acc > 1e-6:
-            best_test_acc = test_acc
-            logger.log_metric("best_test_acc", best_test_acc, step=steps)
+        test_loss /= len(loader.dataset)
+        test_acc = 100. * correct / len(loader.dataset)
+        print('\n{} set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
+            val_or_test, test_loss, correct, len(loader.dataset), test_acc))
+        logger.log_metrics({"accuracy": test_acc, "loss": test_loss},
+                prefix=val_or_test, step=steps)
+
+        # if validation track best accuracy and save best model.
+        if val_or_test == "val" and not logger.disabled:
+            if test_acc - best_test_acc > 1e-5:
+                best_test_acc = test_acc
+                torch.save({"model_state": test_model.state_dict(),
+                    "step": steps, "val_acc": test_acc}, model_path)
+                logger.log_metric("best_val_acc", best_test_acc, step=steps)
         return test_loss
 
 
@@ -202,7 +212,7 @@ if __name__ == "__main__":
 
     for epoch in range(1, epochs+1):
         train(epoch)
-        test()
+        test(model, val_loader, "val")
         if args.lr_scheduler: scheduler.step()
 
         logger.save_act_grads(AGL.get_logs())
@@ -212,3 +222,11 @@ if __name__ == "__main__":
             # lr /= 10
             # for param_group in optimizer.param_groups:
             #     param_group['lr'] = lr
+    
+    # if logging is enabled, then run best model on test set.
+    if not logger.disabled:
+        checkpoint = torch.load(model_path)
+        print("Loading best model from step {} with val_acc: {}..."
+                .format(checkpoint["step"], checkpoint["val_acc"]))
+        model.load_state_dict(checkpoint["model_state"])
+        test(model, test_loader, "test")
