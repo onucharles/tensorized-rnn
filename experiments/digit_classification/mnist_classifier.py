@@ -12,7 +12,7 @@ from t3nsor.layers import TTLinear
 
 class MNIST_Classifier(nn.Module):
     def __init__(self, input_size, output_size, hidden_size, num_layers, device,
-                 tt=True, gru=True, n_cores=3, tt_rank=2, log_grads=False):
+                 tt=True, gru=True, n_cores=3, tt_rank=2, log_grads=False, naive_tt=False):
         super(MNIST_Classifier, self).__init__()
         self.gru = gru
 
@@ -21,8 +21,9 @@ class MNIST_Classifier(nn.Module):
                 self.rnn = TTLSTM(input_size=input_size, hidden_size=hidden_size,
                                 num_layers=num_layers, device=device,
                                 n_cores=n_cores, tt_rank=tt_rank, 
-                                log_grads=log_grads)
+                                log_grads=log_grads, is_naive=naive_tt)
             else:
+                if naive_tt: raise ValueError("Naive TT is not implemented for GRU.")
                 self.rnn = TTGRU(input_size=input_size, hidden_size=hidden_size,
                                 num_layers=num_layers, device=device,
                                 n_cores=n_cores, tt_rank=tt_rank, 

@@ -8,6 +8,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from pathlib import Path
 from torch.autograd import Variable
+import warnings
 
 from utils import data_generator, count_model_params
 from mnist_classifier import MNIST_Classifier
@@ -18,8 +19,6 @@ parser.add_argument('--batch_size', type=int, default=128, metavar='N',
                     help='batch size (default: 128)')
 parser.add_argument('--cuda', action='store_false',
                     help='use CUDA (default: True)')
-parser.add_argument('--tt', action='store_true',
-                    help='use tensorized RNN model (default: False)')
 parser.add_argument('--gru', action='store_true',
                     help='use GRU instead of LSTM (default: False)')
 parser.add_argument('--clip', type=float, default=-1,
@@ -43,6 +42,10 @@ parser.add_argument('--seed', type=int, default=1111,
                     help='random seed (default: 1111)')
 parser.add_argument('--permute', action='store_true',
                     help='use permuted MNIST (default: False)')
+parser.add_argument('--tt', action='store_true',
+                    help='use tensorized RNN model (default: False)')
+parser.add_argument('--naive_tt', action='store_true',
+                    help='use naive tensorized RNN model (default: False).')
 parser.add_argument('--ncores', type=int, default=2,
                     help='number of TT cores (default: 2)')
 parser.add_argument('--ttrank', type=int, default=2,
@@ -60,6 +63,9 @@ if not args.tt:
     args.ncores = 1
     args.ttrank = 1
 
+if args.naive_tt and not args.tt:
+    warnings.warn("'naive_tt' is set to True but 'tt' is not. Model will be a regular RNN.")
+
 # create comet logger.
 logger = CometLogger(not args.enable_logging)
 run_id = logger.get_experiment_key()
@@ -71,7 +77,7 @@ logger.set_name(name)
 
 # saved model path
 model_dir = Path("saved_models") / run_id
-model_dir.mkdir(exist_ok=True)
+model_dir.mkdir(parents=True, exist_ok=True)
 model_path = model_dir / "model.pt"
 
 # fix seeds
