@@ -71,7 +71,8 @@ logger = CometLogger(not args.enable_logging)
 run_id = logger.get_experiment_key()
 mod_name = 'gru' if args.gru else 'lstm'
 logger.log_params(vars(args))
-name = (f"{mod_name}-{'tt' if args.tt else 'no-tt'}-n{args.n_layers}"
+name = (f"{mod_name}-{'nv' if args.naive_tt else ''}"
+        f"{'tt' if args.tt else 'no-tt'}-n{args.n_layers}"
         f"-h{args.hidden_size}-ncores{args.ncores}-rank{args.ttrank}")
 logger.set_name(name)
 
@@ -113,7 +114,8 @@ train_loader, val_loader, test_loader = data_generator(root, batch_size)
 
 model = MNIST_Classifier(input_channels, n_classes, args.hidden_size, args.n_layers, device,
                          tt=args.tt, gru=args.gru, n_cores=args.ncores, 
-                         tt_rank=args.ttrank, log_grads=args.log_grads)
+                         tt_rank=args.ttrank, log_grads=args.log_grads,
+                         naive_tt=args.naive_tt)
 n_trainable, n_nontrainable = count_model_params(model)
 print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"
       .format(n_trainable, n_nontrainable, n_trainable + n_nontrainable))

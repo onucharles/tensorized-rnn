@@ -37,16 +37,19 @@ class TTLSTMCell(LSTMCell):
 
 class TTLSTM(LSTM):
     def __init__(self, input_size, hidden_size, num_layers, device, n_cores, 
-                 tt_rank, bias=True, log_grads=False):
+                 tt_rank, bias=True, log_grads=False, is_naive=False):
         self.n_cores = n_cores
         self.tt_rank = tt_rank
+        self.is_naive = is_naive
         super().__init__(input_size, hidden_size, num_layers, device, bias,
                          log_grads=log_grads)
 
     def _create_first_layer_cell(self):
         return TTLSTMCell(self.input_size, self.hidden_size, self.bias, self.device,
-                          n_cores=self.n_cores, tt_rank=self.tt_rank)
+                          n_cores=self.n_cores, tt_rank=self.tt_rank,
+                          is_naive=self.is_naive)
 
     def _create_other_layer_cell(self):
         return TTLSTMCell(self.hidden_size, self.hidden_size, self.bias, self.device,
-                          n_cores=self.n_cores, tt_rank=self.tt_rank)
+                          n_cores=self.n_cores, tt_rank=self.tt_rank,
+                          is_naive=self.is_naive)
