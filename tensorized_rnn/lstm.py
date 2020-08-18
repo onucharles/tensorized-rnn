@@ -1,9 +1,8 @@
 import torch
 from torch import nn
 
-from .grad_tools import ActivGradLogger
-from .grad_tools import param_count as pc
-
+from .rnn_utils import ActivGradLogger
+from .rnn_utils import param_count as pc
 
 class LSTMCell(nn.Module):
     def __init__(self, input_size, hidden_size, bias, device):

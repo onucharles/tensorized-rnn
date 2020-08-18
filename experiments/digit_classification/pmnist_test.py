@@ -63,8 +63,9 @@ if not args.tt:
     args.ncores = 1
     args.ttrank = 1
 
-if args.naive_tt and not args.tt:
-    warnings.warn("'naive_tt' is set to True but 'tt' is not. Model will be a regular RNN.")
+assert not (args.naive_tt and not args.tt)
+# if args.naive_tt and not args.tt:
+#     warnings.warn("'naive_tt' is set to True but 'tt' is not. Model will be a regular RNN.")
 
 # create comet logger.
 logger = CometLogger(not args.enable_logging)
@@ -122,7 +123,7 @@ print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total
 
 # Setup activation and gradient logging
 if args.log_grads:
-    from tensorized_rnn.grad_tools import ActivGradLogger as AGL
+    from tensorized_rnn.rnn_utils import ActivGradLogger as AGL
 
 permute = torch.Tensor(np.random.permutation(784).astype(np.float64)).long()
 if args.cuda:
@@ -215,7 +216,7 @@ def test(test_model, loader, val_or_test="val"):
 
 if __name__ == "__main__":
     import os.path
-    from tensorized_rnn.grad_tools import ActivGradLogger as AGL
+    from tensorized_rnn.rnn_utils import ActivGradLogger as AGL
     start = time()
 
     for epoch in range(1, epochs+1):

@@ -14,17 +14,20 @@ class TTLinearSet(nn.Module):
         self.n_gates = n_gates
         self.in_features = in_features
         self.out_features = out_features
-        self.gates = []
+        gates = []
         for i in range(n_gates):
             cur_gate = TTLinear(in_features=in_features, out_features=out_features,
                                 bias=bias, auto_shapes=auto_shapes, d=d, tt_rank=tt_rank,
                                 init=init, shape=shape, auto_shape_mode=auto_shape_mode,
                                 auto_shape_criterion=auto_shape_criterion)
             setattr(self, f'gate{i}', cur_gate)
-            self.gates.append(cur_gate)
+            gates.append(cur_gate)
+        self.gates = nn.ModuleList(gates)
 
     def forward(self, x):
         batch_size, in_size = x.size()
+        # print("input is of batch size: {} and input size : {}".format(batch_size, in_size))
+        assert in_size == self.in_features
 
         out = torch.zeros(batch_size, self.out_features * self.n_gates).to(x.device)
         for i in range(self.n_gates):
