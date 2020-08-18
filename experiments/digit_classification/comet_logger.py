@@ -5,8 +5,8 @@ from comet_ml import Experiment, ExistingExperiment
 import matplotlib.pyplot as plt
 import numpy as np
 
-# from config_j import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
-from config import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
+from config_j import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
+# from config import COMET_API_KEY, COMET_WORKSPACE, PROJECT_NAME
 
 class CometLogger():
     def __init__(self, disabled, is_existing=False, prev_exp_key=None):

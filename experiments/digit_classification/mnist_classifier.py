@@ -13,7 +13,7 @@ from t3nsor.layers import TTLinear
 class MNIST_Classifier(nn.Module):
     def __init__(self, input_size, output_size, hidden_size, num_layers, device,
                  tt=True, gru=True, n_cores=3, tt_rank=2, log_grads=False, 
-                 naive_tt=False):
+                 naive_tt=False, extra_core=None):
         super(MNIST_Classifier, self).__init__()
         self.gru = gru
 
@@ -22,15 +22,17 @@ class MNIST_Classifier(nn.Module):
                 self.rnn = TTLSTM(input_size=input_size, hidden_size=hidden_size,
                                 num_layers=num_layers, device=device,
                                 n_cores=n_cores, tt_rank=tt_rank, 
-                                log_grads=log_grads, is_naive=naive_tt)
+                                log_grads=log_grads, is_naive=naive_tt,
+                                new_core=extra_core)
             else:
                 self.rnn = TTGRU(input_size=input_size, hidden_size=hidden_size,
                                 num_layers=num_layers, device=device,
                                 n_cores=n_cores, tt_rank=tt_rank, 
-                                log_grads=log_grads, is_naive=naive_tt)
+                                log_grads=log_grads, is_naive=naive_tt, 
+                                new_core=extra_core)
             self.linear = TTLinear(in_features=hidden_size, 
-                    out_features=output_size, bias=True, 
-                    auto_shapes=True, d=n_cores, tt_rank=tt_rank)
+                                   out_features=output_size, bias=True, 
+                                   auto_shapes=True, d=n_cores, tt_rank=tt_rank)
         else:
             if not gru:
                 self.rnn = LSTM(input_size=input_size, hidden_size=hidden_size,

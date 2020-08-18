@@ -52,6 +52,8 @@ parser.add_argument('--ttrank', type=int, default=2,
                     help='TT rank (default: 2)')
 parser.add_argument('--enable_logging', action='store_true',
                     help='Log metrics to Comet and save model to disk (default: False)')
+parser.add_argument('--extra_core', type=str, default='none',
+                    help='Where to place extra core, if any (options: none, first, last)')
 parser.add_argument('--log_grads', action='store_true',
                     help='Whether to log gradients and activations (default: False)')
 parser.add_argument("--gpu_no", type=int, default=0, help =\
@@ -64,6 +66,8 @@ if not args.tt:
     args.ttrank = 1
 
 assert not (args.naive_tt and not args.tt)
+assert args.extra_core in ['none', 'first', 'last']
+if args.extra_core == 'none': args.extra_core = None
 # if args.naive_tt and not args.tt:
 #     warnings.warn("'naive_tt' is set to True but 'tt' is not. Model will be a regular RNN.")
 
@@ -115,8 +119,8 @@ train_loader, val_loader, test_loader = data_generator(root, batch_size)
 
 model = MNIST_Classifier(input_channels, n_classes, args.hidden_size, args.n_layers, device,
                          tt=args.tt, gru=args.gru, n_cores=args.ncores, 
-                         tt_rank=args.ttrank, log_grads=args.log_grads,
-                         naive_tt=args.naive_tt)
+                         tt_rank=args.ttrank, naive_tt=args.naive_tt, 
+                         log_grads=args.log_grads, extra_core=args.extra_core)
 n_trainable, n_nontrainable = count_model_params(model)
 print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"
       .format(n_trainable, n_nontrainable, n_trainable + n_nontrainable))
