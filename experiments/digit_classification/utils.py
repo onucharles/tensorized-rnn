@@ -3,14 +3,17 @@ from torchvision import datasets, transforms
 from torch.utils.data import random_split
 
 
-def data_generator(root, batch_size):
-    train_set = datasets.MNIST(root=root, train=True, download=True,
+def data_generator(root, batch_size, train_frac=5.0/6):
+    if train_frac == 1.0:
+        raise ValueError("Training set fraction cannot be 1. You need a validation set.")
+
+    train_data = datasets.MNIST(root=root, train=True, download=True,
                                transform=transforms.Compose([
                                    transforms.ToTensor(),
                                    transforms.Normalize((0.1307,), (0.3081,))
                                ]))
-    train_set, val_set = random_split(train_set, [50000, 10000],)
-            #generator=torch.Generator().manual_seed(42))
+    len_train_set = int(train_frac * len(train_data))
+    train_set, val_set = random_split(train_data, [len_train_set, len(train_data) - len_train_set])
 
     test_set = datasets.MNIST(root=root, train=False, download=True,
                               transform=transforms.Compose([

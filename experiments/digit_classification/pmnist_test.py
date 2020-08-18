@@ -57,6 +57,9 @@ parser.add_argument('--log_grads', action='store_true',
 parser.add_argument("--gpu_no", type=int, default=0, help =\
                 "The index of GPU to use if multiple are available. If none, CPU will be used.")
 # parser.add_argument('--models_dir', type=str, help='Path to saved model files.')
+parser.add_argument('--train_frac', type=float, default=5.0/6,
+                    help='Fraction of training set to use for training. '
+                         'The rest will be used for validation. (default: 0.8333)')
 
 args = parser.parse_args()
 if not args.tt:
@@ -76,9 +79,10 @@ name = (f"{mod_name}-{'tt' if args.tt else 'no-tt'}-n{args.n_layers}"
 logger.set_name(name)
 
 # saved model path
-model_dir = Path("saved_models") / run_id
-model_dir.mkdir(parents=True, exist_ok=True)
-model_path = model_dir / "model.pt"
+if not logger.disabled:
+    model_dir = Path("saved_models") / run_id
+    model_dir.mkdir(parents=True, exist_ok=True)
+    model_path = model_dir / "model.pt"
 
 # fix seeds
 torch.manual_seed(args.seed)
@@ -109,7 +113,7 @@ else:               # each row(of pixels) is input for a time step.
 seq_length = int(784 / input_channels)
 
 print(args)
-train_loader, val_loader, test_loader = data_generator(root, batch_size)
+train_loader, val_loader, test_loader = data_generator(root, batch_size, train_frac=args.train_frac)
 
 model = MNIST_Classifier(input_channels, n_classes, args.hidden_size, args.n_layers, device,
                          tt=args.tt, gru=args.gru, n_cores=args.ncores, 
