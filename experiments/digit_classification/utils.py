@@ -1,5 +1,6 @@
 import torch
 from torchvision import datasets, transforms
+from torch.utils.data import random_split
 
 
 def data_generator(root, batch_size):
@@ -8,17 +9,24 @@ def data_generator(root, batch_size):
                                    transforms.ToTensor(),
                                    transforms.Normalize((0.1307,), (0.3081,))
                                ]))
+    train_set, val_set = random_split(train_set, [50000, 10000],)
+            #generator=torch.Generator().manual_seed(42))
+
     test_set = datasets.MNIST(root=root, train=False, download=True,
                               transform=transforms.Compose([
                                   transforms.ToTensor(),
                                   transforms.Normalize((0.1307,), (0.3081,))
                               ]))
+    print(f"train: {len(train_set)}\tval: {len(val_set)}\ttest: {len(test_set)}")
 
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
                         num_workers=12)
+    val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size,
+                        num_workers=12)
+
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size,
                         num_workers=12)
-    return train_loader, test_loader
+    return train_loader, val_loader, test_loader
 
 
 def count_model_params(model):

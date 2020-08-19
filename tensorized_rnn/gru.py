@@ -41,7 +41,7 @@ class GRUCell(nn.Module):
                                     hidden_part[:, hsize:2*hsize])
         new_gate    = torch.tanh(input_part[:, 2*hsize:] + 
                                  reset_gate * hidden_part[:, 2*hsize:])
-        hy          = (1 - reset_gate) * new_gate + reset_gate * hx
+        hy          = (1 - update_gate) * new_gate + update_gate * hx
 
         # Register gradient hooks if we have them
         if hasattr(self, '_h_backward_hook') and hy.requires_grad:
