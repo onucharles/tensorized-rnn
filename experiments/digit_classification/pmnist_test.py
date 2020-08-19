@@ -76,9 +76,9 @@ logger = CometLogger(not args.enable_logging)
 run_id = logger.get_experiment_key()
 mod_name = 'gru' if args.gru else 'lstm'
 logger.log_params(vars(args))
-name = (f"{mod_name}-{'nv' if args.naive_tt else ''}"
-        f"{'tt' if args.tt else 'no-tt'}-n{args.n_layers}"
-        f"-h{args.hidden_size}-ncores{args.ncores}-rank{args.ttrank}")
+tt_prefix = 'no-tt' if not args.tt else ('nvtt' if args.naive_tt else 'tt')
+name = (f"{mod_name}-{tt_prefix}-n{args.n_layers}-h{args.hidden_size}"
+        f"-ncores{args.ncores}-rank{args.ttrank}")
 logger.set_name(name)
 
 # saved model path
