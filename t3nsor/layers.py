@@ -21,14 +21,16 @@ class TTEmbedding(nn.Module):
         super(TTEmbedding, self).__init__()
 
         if auto_shapes:
-            voc_quantization = t3.utils.suggest_shape(
+            # voc_quantization = t3.utils.suggest_shape(
+            voc_quantization=t3.utils.auto_shape(
                 voc_size, d=d, criterion=auto_shape_criterion, mode=auto_shape_mode)
             emb_quantization = t3.utils.auto_shape(
                 emb_size, d=d, criterion=auto_shape_criterion, mode=auto_shape_mode)
 
             shape = [voc_quantization, emb_quantization]
             self.shape = shape
-            
+            print('Created TTEmbedding layer with input shape: {}. output shape: {}'
+                  .format(voc_quantization, emb_quantization))
         else:
             self.shape = shape
 

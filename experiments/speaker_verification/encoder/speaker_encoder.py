@@ -80,7 +80,7 @@ class SpeakerEncoder(nn.Module):
         # # We take only the hidden state of the last layer
         # embeds_raw = self.relu(self.linear(hidden[-1]))
         out, (last_hidden, last_cell) = self.lstm(utterances)
-        embeds_raw = self.relu(self.linear(last_hidden))
+        embeds_raw = self.relu(self.linear(last_hidden[-1]))
         
         # L2-normalize it
         embeds = embeds_raw / torch.norm(embeds_raw, dim=1, keepdim=True)

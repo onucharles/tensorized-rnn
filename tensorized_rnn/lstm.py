@@ -94,8 +94,8 @@ class LSTM(nn.Module):
         return LSTMCell(self.hidden_size, self.hidden_size, self.bias, self.device)
 
     def init_hidden(self, batch_size):
-        h = torch.zeros(batch_size, self.hidden_size).to(self.device)
-        c = torch.zeros(batch_size, self.hidden_size).to(self.device)
+        h = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(self.device)
+        c = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(self.device)
         return h, c
 
     def param_count(self):
@@ -109,8 +109,8 @@ class LSTM(nn.Module):
     def forward(self, input, init_states=None):
         """
         :param input:       Tensor of input data of shape (batch_size, seq_len, input_size).
-        :param init_states: Initial hidden states of LSTM. If None, is initialized to zeros.
-                            Shape is (batch_size, hidden_size).
+        :param init_states: Initial hidden states of LSTM --- a tuple(h, c). If None, is initialized to zeros.
+                            Shape of h and c is (num_layers, batch_size, hidden_size).
 
         :return:    outputs, (h, c)
                     outputs:  Torch tensor of shape (seq_len, batch_size, hidden_size) containing
@@ -126,7 +126,10 @@ class LSTM(nn.Module):
 
         # initialise hidden and cell states.
         (h, c) = self.init_hidden(batch_size) if init_states is None else init_states
-        internal_state = [(h, c)] * self.num_layers
+        h_layers, c_layers = [], []
+        for i in range(self.num_layers):
+            h_layers.append(h[i])
+            c_layers.append(c[i])
 
         for step in range(seq_len):
             x = input[:, step, :]
@@ -135,9 +138,9 @@ class LSTM(nn.Module):
                 # lstm_cell = getattr(self, name)
                 lstm_cell = self._all_layers[i]
 
-                (h, c) = internal_state[i]
-                x, new_c = lstm_cell(x, h, c)
-                internal_state[i] = (x, new_c)
+                h_i, c_i = h_layers[i], c_layers[i]
+                x, new_c = lstm_cell(x, h_i, c_i)
+                h_layers[i], c_layers[i] = x, new_c
             outputs[:, step, :] = x
 
-        return outputs, (x, new_c)
+        return outputs, (torch.stack(h_layers), torch.stack(c_layers))
