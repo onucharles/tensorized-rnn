@@ -18,7 +18,7 @@ class Dictionary(object):
 
 
 class Corpus(object):
-    def __init__(self, path, train_frac=1.0, voc_pad=0):
+    def __init__(self, path, train_frac=1.0, voc_pad=0, full_test=False):
         self.dictionary = Dictionary()
         self.train = self.tokenize(os.path.join(path, 'train.txt'))
         self.valid = self.tokenize(os.path.join(path, 'valid.txt'))
@@ -34,7 +34,7 @@ class Corpus(object):
         new_test_count = int(train_frac * self.test.size(0))
         self.train = self.train[:new_train_count]
         self.valid = self.valid[:new_valid_count]
-        self.test = self.test[:new_test_count]
+        if not full_test: self.test = self.test[:new_test_count]
 
         print(f"Number of tokens in each set({train_frac*100}% of total training data):")
         print("\ttrain: {} \n\tvalid: {}\n\ttest: {}"
