@@ -7,9 +7,13 @@ from comet_logger import CometLogger    # Must be imported before torch
 import torch
 import torch.nn as nn
 import torch.onnx
+from functools import partial
 
 import data
 import model
+
+# Better printing in cluster environment
+print = partial(print, flush=True)
 
 parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM/GRU Language Model')
 parser.add_argument('--data', type=str, default='./data/wikitext-2',
@@ -26,16 +30,16 @@ parser.add_argument('--lr', type=float, default=20,
                     help='initial learning rate')
 parser.add_argument('--clip', type=float, default=0.25,
                     help='gradient clipping')
-parser.add_argument('--epochs', type=int, default=40,
+parser.add_argument('--epochs', type=int, default=200,
                     help='upper epoch limit')
 parser.add_argument('--batch_size', type=int, default=20, metavar='N',
                     help='batch size')
-parser.add_argument('--bptt', type=int, default=35,
+parser.add_argument('--bptt', type=int, default=40,
                     help='sequence length')
 parser.add_argument('--dropout', type=float, default=0,
                     help='dropout applied to layers (0 = no dropout)')
-parser.add_argument('--tied', action='store_true',
-                    help='tie the word embedding and softmax weights')
+# parser.add_argument('--tied', action='store_true',
+#                     help='tie the word embedding and softmax weights')
 parser.add_argument('--seed', type=int, default=1111,
                     help='random seed')
 parser.add_argument('--cuda', action='store_false',
@@ -129,7 +133,7 @@ test_data = batchify(corpus.test, eval_batch_size)
 
 ntokens = len(corpus.dictionary)
 model = model.RNNModel(args.model, ntokens, args.emsize, args.nhid, args.nlayers, device,
-                       args.dropout, args.tied, tt=args.tt, n_cores=args.ncores,
+                       args.dropout, tie_weights=False, tt=args.tt, n_cores=args.ncores,
                        tt_rank=args.ttrank, naive_tt=args.naive_tt).to(device)
 print(f"Number of parameters in model: {model.param_count()}")
 
@@ -178,7 +182,7 @@ def evaluate(data_source):
             hidden = repackage_hidden(hidden)
             total_loss += len(data) * criterion(output, targets).item()
 
-    return total_loss / (len(data_source) - 1)
+    return total_loss / len(data_source)
 
 
 def train():
@@ -246,7 +250,7 @@ try:
         val_ppl = math.exp(val_loss)
         epoch_time = time.time() - epoch_start_time
         logger.log_metrics({"val_loss": val_loss, "val_ppl": val_ppl, 
-                            "lr": lr, "epoch_time": epoch_time}, epoch=epoch)
+                            "lr_now": lr, "epoch_time": epoch_time}, epoch=epoch)
         print('-' * 89)
         print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
                 'valid ppl {:8.2f}'.format(epoch, epoch_time, val_loss, 
