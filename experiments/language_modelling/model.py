@@ -47,16 +47,18 @@ class RNNModel(nn.Module):
             self.decoder = nn.Linear(nhid, ntoken)
 
             ### Using PyTorch LSTM and GRU
-            #
+            # self.encoder = nn.Embedding(ntoken, ninp)
+
             # if rnn_type in ['LSTM', 'GRU']:
-            #     self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout, batch_first=True)
+                # self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout, batch_first=True)
             # else:
-            #     try:
-            #         nonlinearity = {'RNN_TANH': 'tanh', 'RNN_RELU': 'relu'}[rnn_type]
-            #     except KeyError:
-            #         raise ValueError( """An invalid option for `--model` was supplied,
-            #                          options are ['LSTM', 'GRU', 'RNN_TANH' or 'RNN_RELU']""")
-            #     self.rnn = nn.RNN(ninp, nhid, nlayers, nonlinearity=nonlinearity, dropout=dropout, batch_first=True)
+                # try:
+                    # nonlinearity = {'RNN_TANH': 'tanh', 'RNN_RELU': 'relu'}[rnn_type]
+                # except KeyError:
+                    # raise ValueError( """An invalid option for `--model` was supplied,
+                                     # options are ['LSTM', 'GRU', 'RNN_TANH' or 'RNN_RELU']""")
+                # self.rnn = nn.RNN(ninp, nhid, nlayers, nonlinearity=nonlinearity, dropout=dropout, batch_first=True)
+            # self.decoder = nn.Linear(nhid, ntoken)
 
 
         # Optionally tie weights as in:
@@ -89,9 +91,9 @@ class RNNModel(nn.Module):
         # input dim: seq_len, batch_size
 
         emb = self.drop(self.encoder(input))
-        output, hidden = self.rnn(emb.transpose(0, 1), hidden)
-        output = self.drop(output)
-        output = output.view(-1, self.nhid)
+        output, hidden = self.rnn(emb.transpose(1, 0), hidden) 
+        output = self.drop(output.transpose(1, 0))
+        output = output.reshape(-1, self.nhid)
         decoded = self.decoder(output)
         # decoded = decoded.view(-1, self.ntoken)
         return F.log_softmax(decoded, dim=1), hidden
