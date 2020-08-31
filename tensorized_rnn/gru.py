@@ -91,7 +91,7 @@ class GRU(nn.Module):
         return GRUCell(self.hidden_size, self.hidden_size, self.bias, self.device)
 
     def init_hidden(self, batch_size):
-        h = torch.zeros(batch_size, self.hidden_size).to(self.device)
+        h = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(self.device)
         return h
 
     def param_count(self):
@@ -105,7 +105,7 @@ class GRU(nn.Module):
         """
         :param input:       Tensor of input data of shape (batch_size, seq_len, input_size).
         :param init_states: Initial hidden states of GRU. If None, is initialized to zeros.
-                            Shape is (batch_size, hidden_size).
+                            Shape is (num_layers, batch_size, hidden_size).
 
         :return:    outputs, h
                     outputs:  Torch tensor of shape (seq_len, batch_size, hidden_size) 
@@ -119,21 +119,18 @@ class GRU(nn.Module):
 
         # initialise hidden and cell states.
         h = self.init_hidden(batch_size) if init_states is None else init_states
-        internal_state = [h] * self.num_layers
 
         for step in range(seq_len):
             x = input[:, step, :]
+            hiddens = []
             for i in range(self.num_layers):
-                # name = 'cell{}'.format(i)
-                # gru_cell = getattr(self, name)
                 gru_cell = self._all_layers[i]
-
-                h = internal_state[i]
-                x = gru_cell(x, h)
-                internal_state[i] = x
+                x = gru_cell(x, h[i])
+                hiddens.append(x)
             outputs[:, step, :] = x
+            h = torch.stack(hiddens)
 
-        return outputs, x
+        return outputs, h
 
 
 class TTGRUCell(GRUCell):

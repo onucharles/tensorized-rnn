@@ -3,21 +3,26 @@ import argparse
 import time
 import math
 import os
+from comet_logger import CometLogger    # Must be imported before torch
 import torch
 import torch.nn as nn
 import torch.onnx
+from functools import partial
 
 import data
 import model
+
+# Better printing in cluster environment
+print = partial(print, flush=True)
 
 parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM/GRU Language Model')
 parser.add_argument('--data', type=str, default='./data/wikitext-2',
                     help='location of the data corpus')
 parser.add_argument('--model', type=str, default='LSTM',
-                    help='type of recurrent net (RNN_TANH, RNN_RELU, LSTM, GRU)')
-parser.add_argument('--emsize', type=int, default=200,
+                    help='type of recurrent net (LSTM, GRU)')
+parser.add_argument('--emsize', type=int, default=256,
                     help='size of word embeddings')
-parser.add_argument('--nhid', type=int, default=200,
+parser.add_argument('--nhid', type=int, default=256,
                     help='number of hidden units per layer')
 parser.add_argument('--nlayers', type=int, default=2,
                     help='number of layers')
@@ -25,19 +30,19 @@ parser.add_argument('--lr', type=float, default=20,
                     help='initial learning rate')
 parser.add_argument('--clip', type=float, default=0.25,
                     help='gradient clipping')
-parser.add_argument('--epochs', type=int, default=40,
+parser.add_argument('--epochs', type=int, default=200,
                     help='upper epoch limit')
 parser.add_argument('--batch_size', type=int, default=20, metavar='N',
                     help='batch size')
-parser.add_argument('--bptt', type=int, default=35,
+parser.add_argument('--bptt', type=int, default=40,
                     help='sequence length')
 parser.add_argument('--dropout', type=float, default=0,
                     help='dropout applied to layers (0 = no dropout)')
-parser.add_argument('--tied', action='store_true',
-                    help='tie the word embedding and softmax weights')
+# parser.add_argument('--tied', action='store_true',
+#                     help='tie the word embedding and softmax weights')
 parser.add_argument('--seed', type=int, default=1111,
                     help='random seed')
-parser.add_argument('--cuda', action='store_true',
+parser.add_argument('--cuda', action='store_false',
                     help='use CUDA')
 parser.add_argument('--log-interval', type=int, default=100, metavar='N',
                     help='report interval')
@@ -49,6 +54,8 @@ parser.add_argument('--dry-run', action='store_true',
                     help='verify the code and the model')
 parser.add_argument('--train_frac', type=float, default=0.2,
                     help='Fraction of training data to use.')
+parser.add_argument('--full_test', action='store_false',
+                    help='use the full test set (default: True)')
 parser.add_argument('--tt', action='store_true',
                     help='use tensorized RNN model (default: False)')
 parser.add_argument('--naive_tt', action='store_true',
@@ -59,24 +66,40 @@ parser.add_argument('--ttrank', type=int, default=2,
                     help='TT rank (default: 2)')
 parser.add_argument('--voc_pad', type=int, default=22,
                     help='amount of padding to vocabulary size.')
+parser.add_argument('--enable_logging', action='store_true',
+                    help='Log metrics to Comet (default: False)')
 args = parser.parse_args()
 print(args)
 
 assert 0.0 < args.train_frac <= 1.0, "arg 'train_frac' must be betweetn (0.0  1.0]"
+assert not (args.naive_tt and not args.tt)
+if args.dry_run: args.enable_logging = False
 
 # Set the random seed manually for reproducibility.
 torch.manual_seed(args.seed)
 if torch.cuda.is_available():
     if not args.cuda:
         print("WARNING: You have a CUDA device, so you should probably run with --cuda")
+else:
+    args.cuda = False
 
 device = torch.device("cuda" if args.cuda else "cpu")
+
+# Set comet.ml logging
+logger = CometLogger(not args.enable_logging)
+logger.log_params(vars(args))
+name = (f"{args.model.lower()}-{'nv' if args.naive_tt else ''}"
+        f"{'tt-' if args.tt else ''}h{args.nhid}-n{args.nlayers}" + 
+        (f"-ncores{args.ncores}-rank{args.ttrank}" if args.tt else '') + 
+        f"-{int(100*args.train_frac)}%")
+logger.set_name(name)
 
 ###############################################################################
 # Load data
 ###############################################################################
 
-corpus = data.Corpus(args.data, args.train_frac, args.voc_pad)
+corpus = data.Corpus(args.data, args.train_frac, args.voc_pad, 
+                     full_test=args.full_test)
 
 # Starting from sequential data, batchify arranges the dataset into columns.
 # For instance, with the alphabet as the sequence and batch size 4, we'd get
@@ -110,10 +133,9 @@ test_data = batchify(corpus.test, eval_batch_size)
 
 ntokens = len(corpus.dictionary)
 model = model.RNNModel(args.model, ntokens, args.emsize, args.nhid, args.nlayers, device,
-                       args.dropout, args.tied, tt=args.tt, n_cores=args.ncores,
+                       args.dropout, tie_weights=False, tt=args.tt, n_cores=args.ncores,
                        tt_rank=args.ttrank, naive_tt=args.naive_tt).to(device)
 print(f"Number of parameters in model: {model.param_count()}")
-
 
 criterion = nn.NLLLoss()
 
@@ -159,13 +181,16 @@ def evaluate(data_source):
             output, hidden = model(data, hidden)
             hidden = repackage_hidden(hidden)
             total_loss += len(data) * criterion(output, targets).item()
-    return total_loss / (len(data_source) - 1)
+
+    return total_loss / len(data_source)
 
 
 def train():
     # Turn on training mode which enables dropout.
     model.train()
+    num_steps = 0
     total_loss = 0.
+    running_loss = 0.
     start_time = time.time()
     ntokens = len(corpus.dictionary)
 
@@ -185,19 +210,22 @@ def train():
         for p in model.parameters():
             p.data.add_(p.grad, alpha=-lr)
 
+        num_steps += 1
         total_loss += loss.item()
+        running_loss += loss.item()
 
         if batch % args.log_interval == 0 and batch > 0:
-            cur_loss = total_loss / args.log_interval
+            cur_loss = running_loss / args.log_interval
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
                     'loss {:5.2f} | ppl {:8.2f}'.format(
                 epoch, batch, len(train_data) // args.bptt, lr,
                 elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
-            total_loss = 0
+            running_loss = 0
             start_time = time.time()
         if args.dry_run:
             break
+    logger.log_metric("train_loss", total_loss / num_steps, epoch=epoch)
 
 
 def export_onnx(path, batch_size, seq_len):
@@ -219,10 +247,14 @@ try:
         epoch_start_time = time.time()
         train()
         val_loss = evaluate(val_data)
+        val_ppl = math.exp(val_loss)
+        epoch_time = time.time() - epoch_start_time
+        logger.log_metrics({"val_loss": val_loss, "val_ppl": val_ppl, 
+                            "lr_now": lr, "epoch_time": epoch_time}, epoch=epoch)
         print('-' * 89)
         print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
-                'valid ppl {:8.2f}'.format(epoch, (time.time() - epoch_start_time),
-                                           val_loss, math.exp(val_loss)))
+                'valid ppl {:8.2f}'.format(epoch, epoch_time, val_loss, 
+                                           math.exp(val_loss)))
         print('-' * 89)
         # Save the model if the validation loss is the best we've seen so far.
         if not best_val_loss or val_loss < best_val_loss:
@@ -247,9 +279,11 @@ with open(args.save, 'rb') as f:
 
 # Run on test data.
 test_loss = evaluate(test_data)
+test_ppl = math.exp(test_loss)
+logger.log_metrics({"test_loss": test_loss, "test_ppl": test_ppl}, epoch=epoch)
 print('=' * 89)
 print('| End of training | test loss {:5.2f} | test ppl {:8.2f}'.format(
-    test_loss, math.exp(test_loss)))
+    test_loss, test_ppl))
 print('=' * 89)
 
 if len(args.onnx_export) > 0:
