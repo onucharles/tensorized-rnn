@@ -7,6 +7,7 @@ from comet_logger import CometLogger    # Must be imported before torch
 import torch
 import torch.nn as nn
 import torch.onnx
+import numpy as np
 from functools import partial
 
 import data
@@ -24,22 +25,22 @@ parser.add_argument('--emsize', type=int, default=256,
                     help='size of word embeddings')
 parser.add_argument('--nhid', type=int, default=256,
                     help='number of hidden units per layer')
-parser.add_argument('--nlayers', type=int, default=2,
+parser.add_argument('--nlayers', type=int, default=1,
                     help='number of layers')
-parser.add_argument('--lr', type=float, default=20,
+parser.add_argument('--lr', type=float, default=0.1,
                     help='initial learning rate')
 parser.add_argument('--clip', type=float, default=0.25,
                     help='gradient clipping')
-parser.add_argument('--epochs', type=int, default=200,
+parser.add_argument('--epochs', type=int, default=40,
                     help='upper epoch limit')
 parser.add_argument('--batch_size', type=int, default=20, metavar='N',
                     help='batch size')
-parser.add_argument('--bptt', type=int, default=40,
+parser.add_argument('--bptt', type=int, default=35,
                     help='sequence length')
-parser.add_argument('--dropout', type=float, default=0,
+parser.add_argument('--dropout', type=float, default=0.1,
                     help='dropout applied to layers (0 = no dropout)')
-# parser.add_argument('--tied', action='store_true',
-#                     help='tie the word embedding and softmax weights')
+parser.add_argument('--tied', action='store_true',
+                    help='tie the word embedding and softmax weights')
 parser.add_argument('--seed', type=int, default=1111,
                     help='random seed')
 parser.add_argument('--cuda', action='store_false',
@@ -66,6 +67,12 @@ parser.add_argument('--ttrank', type=int, default=2,
                     help='TT rank (default: 2)')
 parser.add_argument('--voc_pad', type=int, default=22,
                     help='amount of padding to vocabulary size.')
+parser.add_argument('--optimizer', type=str,  default='adam',
+                    help='optimizer to use (sgd, adam)')
+parser.add_argument('--patience', type=int,  default=4,
+                    help='number of non-improving epochs before dropping lr')
+parser.add_argument('--lr_drop', type=float,  default=10.,
+                    help='amount to drop lr by')
 parser.add_argument('--enable_logging', action='store_true',
                     help='Log metrics to Comet (default: False)')
 args = parser.parse_args()
@@ -76,6 +83,7 @@ assert not (args.naive_tt and not args.tt)
 if args.dry_run: args.enable_logging = False
 
 # Set the random seed manually for reproducibility.
+np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 if torch.cuda.is_available():
     if not args.cuda:
@@ -133,10 +141,9 @@ test_data = batchify(corpus.test, eval_batch_size)
 
 ntokens = len(corpus.dictionary)
 model = model.RNNModel(args.model, ntokens, args.emsize, args.nhid, args.nlayers, device,
-                       args.dropout, tie_weights=False, tt=args.tt, n_cores=args.ncores,
+                       args.dropout, args.tied, tt=args.tt, n_cores=args.ncores,
                        tt_rank=args.ttrank, naive_tt=args.naive_tt).to(device)
 print(f"Number of parameters in model: {model.param_count()}")
-
 criterion = nn.NLLLoss()
 
 ###############################################################################
@@ -162,8 +169,8 @@ def repackage_hidden(h):
 # by the batchify function. The chunks are along dimension 0, corresponding
 # to the seq_len dimension in the LSTM.
 
-def get_batch(source, i):
-    seq_len = min(args.bptt, len(source) - 1 - i)
+def get_batch(source, i, seq_len):
+    seq_len = min(seq_len, len(source) - 1 - i)
     data = source[i:i+seq_len]
     target = source[i+1:i+1+seq_len].view(-1)
     return data, target
@@ -177,7 +184,7 @@ def evaluate(data_source):
     hidden = model.init_hidden(eval_batch_size)
     with torch.no_grad():
         for i in range(0, data_source.size(0) - 1, args.bptt):
-            data, targets = get_batch(data_source, i)
+            data, targets = get_batch(data_source, i, args.bptt)
             output, hidden = model(data, hidden)
             hidden = repackage_hidden(hidden)
             total_loss += len(data) * criterion(output, targets).item()
@@ -193,22 +200,27 @@ def train():
     running_loss = 0.
     start_time = time.time()
     ntokens = len(corpus.dictionary)
-
     hidden = model.init_hidden(args.batch_size)
-    for batch, i in enumerate(range(0, train_data.size(0) - 1, args.bptt)):
-        data, targets = get_batch(train_data, i)
+
+    batch, i = 0, 0
+    while i < train_data.size(0) - 1 - 1:
+        # Randomize the length so we don't have same batches every epoch
+        seq_len = args.bptt if np.random.random() < 0.95 else args.bptt // 2
+        data, targets = get_batch(train_data, i, seq_len)
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
-        model.zero_grad()
+        #model.zero_grad()
         hidden = repackage_hidden(hidden)
+        optimizer.zero_grad()
         output, hidden = model(data, hidden)
         loss = criterion(output, targets)
         loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-        for p in model.parameters():
-            p.data.add_(p.grad, alpha=-lr)
+        #for p in model.parameters():
+        #    p.data.add_(p.grad, alpha=-lr)
+        optimizer.step()
 
         num_steps += 1
         total_loss += loss.item()
@@ -217,7 +229,7 @@ def train():
         if batch % args.log_interval == 0 and batch > 0:
             cur_loss = running_loss / args.log_interval
             elapsed = time.time() - start_time
-            print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
+            print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:1.0e} | ms/batch {:5.2f} | '
                     'loss {:5.2f} | ppl {:8.2f}'.format(
                 epoch, batch, len(train_data) // args.bptt, lr,
                 elapsed * 1000 / args.log_interval, cur_loss, math.exp(cur_loss)))
@@ -225,6 +237,11 @@ def train():
             start_time = time.time()
         if args.dry_run:
             break
+
+        batch += 1
+        i += seq_len
+
+    train_loss = total_loss / num_steps
     logger.log_metric("train_loss", total_loss / num_steps, epoch=epoch)
 
 
@@ -239,10 +256,18 @@ def export_onnx(path, batch_size, seq_len):
 
 # Loop over epochs.
 lr = args.lr
-best_val_loss = None
+bad_epochs = 0
+best_val_loss = 1e9
 
 # At any point you can hit Ctrl + C to break out of training early.
 try:
+    # Initiialize the optimizer
+    params = list(model.parameters())
+    if args.optimizer == 'sgd':
+        optimizer = torch.optim.SGD(params, lr=args.lr)
+    if args.optimizer == 'adam':
+        optimizer = torch.optim.Adam(params, lr=args.lr)
+
     for epoch in range(1, args.epochs+1):
         epoch_start_time = time.time()
         train()
@@ -250,20 +275,27 @@ try:
         val_ppl = math.exp(val_loss)
         epoch_time = time.time() - epoch_start_time
         logger.log_metrics({"val_loss": val_loss, "val_ppl": val_ppl, 
-                            "lr_now": lr, "epoch_time": epoch_time}, epoch=epoch)
+                            "cur_lr": lr, "epoch_time": epoch_time}, epoch=epoch)
         print('-' * 89)
         print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
-                'valid ppl {:8.2f}'.format(epoch, epoch_time, val_loss, 
-                                           math.exp(val_loss)))
+                'valid ppl {:8.2f}'.format(epoch, epoch_time, val_loss, val_ppl))
         print('-' * 89)
         # Save the model if the validation loss is the best we've seen so far.
-        if not best_val_loss or val_loss < best_val_loss:
+        if val_loss < best_val_loss:
             with open(args.save, 'wb') as f:
                 torch.save(model, f)
             best_val_loss = val_loss
+            bad_epochs = 0
         else:
-            # Anneal the learning rate if no improvement has been seen in the validation dataset.
-            lr /= 4.0
+            # Anneal the learning rate if we're out of patience
+            bad_epochs += 1
+            if bad_epochs > args.patience:
+                bad_epochs = 0
+                lr /= args.lr_drop
+                optimizer.param_groups[0]['lr'] = lr
+                if lr < 5e-6:   # Too small for effective training
+                    break
+
 except KeyboardInterrupt:
     print('-' * 89)
     print('Exiting from training early')
