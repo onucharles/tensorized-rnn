@@ -27,7 +27,7 @@ parser.add_argument('--nhid', type=int, default=256,
                     help='number of hidden units per layer')
 parser.add_argument('--nlayers', type=int, default=1,
                     help='number of layers')
-parser.add_argument('--lr', type=float, default=0.1,
+parser.add_argument('--lr', type=float, default=5,
                     help='initial learning rate')
 parser.add_argument('--clip', type=float, default=0.25,
                     help='gradient clipping')
@@ -37,7 +37,7 @@ parser.add_argument('--batch_size', type=int, default=20, metavar='N',
                     help='batch size')
 parser.add_argument('--bptt', type=int, default=35,
                     help='sequence length')
-parser.add_argument('--dropout', type=float, default=0.1,
+parser.add_argument('--dropout', type=float, default=0.,
                     help='dropout applied to layers (0 = no dropout)')
 parser.add_argument('--tied', action='store_true',
                     help='tie the word embedding and softmax weights')
@@ -67,14 +67,19 @@ parser.add_argument('--ttrank', type=int, default=2,
                     help='TT rank (default: 2)')
 parser.add_argument('--voc_pad', type=int, default=22,
                     help='amount of padding to vocabulary size.')
-parser.add_argument('--optimizer', type=str,  default='adam',
+parser.add_argument('--optimizer', type=str,  default='sgd',
                     help='optimizer to use (sgd, adam)')
 parser.add_argument('--patience', type=int,  default=4,
                     help='number of non-improving epochs before dropping lr')
 parser.add_argument('--lr_drop', type=float,  default=10.,
                     help='amount to drop lr by')
+parser.add_argument('--leadin', type=int,  default=5,
+                    help='initial epochs before lr scheduler begins')
+parser.add_argument('--tt_embedding', action='store_true',
+                    help='Tensor train word embeddings (default: False)')
 parser.add_argument('--enable_logging', action='store_true',
                     help='Log metrics to Comet (default: False)')
+
 args = parser.parse_args()
 print(args)
 
@@ -99,8 +104,13 @@ logger.log_params(vars(args))
 name = (f"{args.model.lower()}-{'nv' if args.naive_tt else ''}"
         f"{'tt-' if args.tt else ''}h{args.nhid}-n{args.nlayers}" + 
         (f"-ncores{args.ncores}-rank{args.ttrank}" if args.tt else '') + 
-        f"-{int(100*args.train_frac)}%")
+        f"-{int(100*args.train_frac)}%-{args.optimizer}")
 logger.set_name(name)
+
+# Use name of specific configuration to set model path
+args.save = f"best_models/{name}.pt"
+if not os.path.isfile(args.save): 
+    print(f"Overwriting previous model file'{args.save}'")
 
 ###############################################################################
 # Load data
@@ -142,7 +152,8 @@ test_data = batchify(corpus.test, eval_batch_size)
 ntokens = len(corpus.dictionary)
 model = model.RNNModel(args.model, ntokens, args.emsize, args.nhid, args.nlayers, device,
                        args.dropout, args.tied, tt=args.tt, n_cores=args.ncores,
-                       tt_rank=args.ttrank, naive_tt=args.naive_tt).to(device)
+                       tt_rank=args.ttrank, naive_tt=args.naive_tt, 
+                       tt_embedding=args.tt_embedding).to(device)
 print(f"Number of parameters in model: {model.param_count()}")
 criterion = nn.NLLLoss()
 
@@ -242,7 +253,9 @@ def train():
         i += seq_len
 
     train_loss = total_loss / num_steps
-    logger.log_metric("train_loss", total_loss / num_steps, epoch=epoch)
+    train_ppl = math.exp(train_loss) if train_loss < 15 else float('nan')
+    logger.log_metric("train_loss", train_loss, epoch=epoch)
+    logger.log_metric("train_ppl", train_ppl, epoch=epoch)
 
 
 def export_onnx(path, batch_size, seq_len):
@@ -272,9 +285,9 @@ try:
         epoch_start_time = time.time()
         train()
         val_loss = evaluate(val_data)
-        val_ppl = math.exp(val_loss)
+        val_ppl = math.exp(val_loss) if val_loss < 15 else float('nan')
         epoch_time = time.time() - epoch_start_time
-        logger.log_metrics({"val_loss": val_loss, "val_ppl": val_ppl, 
+        logger.log_metrics({"val_loss": val_loss, "val_ppl": math.exp(val_loss), 
                             "cur_lr": lr, "epoch_time": epoch_time}, epoch=epoch)
         print('-' * 89)
         print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
@@ -287,14 +300,15 @@ try:
             best_val_loss = val_loss
             bad_epochs = 0
         else:
+            # lr /= 4
             # Anneal the learning rate if we're out of patience
-            bad_epochs += 1
+            if epoch > args.leadin: bad_epochs += 1
             if bad_epochs > args.patience:
                 bad_epochs = 0
                 lr /= args.lr_drop
                 optimizer.param_groups[0]['lr'] = lr
-                if lr < 5e-6:   # Too small for effective training
-                    break
+            if lr < 1e-4:   # Too small for effective training
+                break
 
 except KeyboardInterrupt:
     print('-' * 89)

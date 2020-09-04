@@ -33,7 +33,7 @@ class Corpus(object):
         new_valid_count = int(train_frac * self.valid.size(0))
         new_test_count = int(train_frac * self.test.size(0))
         self.train = self.train[:new_train_count]
-        self.valid = self.valid[:new_valid_count]
+        if not full_test: self.valid = self.test[:new_valid_count]
         if not full_test: self.test = self.test[:new_test_count]
 
         print(f"Number of tokens in each set({train_frac*100}% of total training data):")

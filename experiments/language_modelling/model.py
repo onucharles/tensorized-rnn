@@ -14,15 +14,25 @@ class RNNModel(nn.Module):
     """Container module with an encoder, a recurrent module, and a decoder."""
 
     def __init__(self, rnn_type, ntoken, ninp, nhid, nlayers, device, dropout=0.5, tie_weights=False,
-                 tt=False, n_cores=3, tt_rank=2, naive_tt=False):
+                 tt=False, n_cores=3, tt_rank=2, naive_tt=False, tt_embedding=False):
         super(RNNModel, self).__init__()
         self.ntoken = ntoken
         self.tt = tt
         self.drop = nn.Dropout(dropout)
 
+        # Embedding
+        if tt_embedding:
+            self.encoder = TTEmbedding(voc_size=ntoken, emb_size=ninp, 
+                                       auto_shapes=True, d=n_cores, tt_rank=tt_rank)
+            self.decoder = TTLinear(in_features=nhid, out_features=ntoken, auto_shapes=True, d=n_cores,
+                                    tt_rank=tt_rank)
+        else:
+            self.encoder = nn.Embedding(ntoken, ninp)
+            self.decoder = nn.Linear(nhid, ntoken)
+
+        # RNN
         if tt:
-            self.encoder = TTEmbedding(voc_size=ntoken, emb_size=ninp, auto_shapes=True, d=n_cores,
-                                       tt_rank=tt_rank)
+            # Tensorized
             if rnn_type == 'LSTM':
                 self.rnn = TTLSTM(input_size=ninp, hidden_size=nhid, num_layers=nlayers, device=device,
                                   n_cores=n_cores, tt_rank=tt_rank, log_grads=False, is_naive=naive_tt)
@@ -32,19 +42,14 @@ class RNNModel(nn.Module):
                                  n_cores=n_cores, tt_rank=tt_rank, log_grads=False)
             else:
                 raise ValueError("Unknown TT-RNN type was passed: ", rnn_type)
-
-            self.decoder = TTLinear(in_features=nhid, out_features=ntoken, auto_shapes=True, d=n_cores,
-                                    tt_rank=tt_rank)
         else:
-            self.encoder = nn.Embedding(ntoken, ninp)
+            # Untensorized
             if rnn_type == 'LSTM':
                 self.rnn = LSTM(input_size=ninp, hidden_size=nhid, num_layers=nlayers, device=device)
             elif rnn_type == 'GRU':
                 self.rnn = GRU(input_size=ninp, hidden_size=nhid, num_layers=nlayers, device=device)
             else:
                 raise ValueError("Unknown TT-RNN type was passed.")
-
-            self.decoder = nn.Linear(nhid, ntoken)
 
             ### Using PyTorch LSTM and GRU
             # self.encoder = nn.Embedding(ntoken, ninp)
