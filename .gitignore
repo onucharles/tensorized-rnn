@@ -1,8 +1,9 @@
 # project folder
 data/
 
-# settings file
+# settings and config file
 settings.py
+config.py
 
 # pycharm
 .idea/
