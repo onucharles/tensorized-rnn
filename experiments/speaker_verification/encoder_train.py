@@ -31,6 +31,9 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=11, help= \
         "The random seed to use.")
     parser.add_argument("--train_frac", type=float, default=1.0, help="Fraction of training data to use.")
+    parser.add_argument("--log_grad", action="store_true", help="Log gradients.")
+    parser.add_argument("--clip", type=int, default=3, help="The max norm for gradient clipping.")
+
     args = parser.parse_args()
 
     assert 0.0 < args.train_frac <= 1.0

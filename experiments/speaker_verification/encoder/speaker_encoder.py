@@ -17,10 +17,11 @@ from tensorized_rnn.lr_linear import LRLinear
 class SpeakerEncoder(nn.Module):
     def __init__(self, mel_n_channels, model_hidden_size, model_num_layers,
                  model_embedding_size, device, loss_device, compression=None,
-                 n_cores=3, rank=8):
+                 n_cores=3, rank=8, clip=3):
         super().__init__()
 
         self.loss_device = loss_device
+        self.clip = clip
 
         # Network definition
         if compression is None:
@@ -44,7 +45,6 @@ class SpeakerEncoder(nn.Module):
                                    bias=True, auto_shapes=True, d=n_cores, tt_rank=rank).to(device)
         else:
             raise ValueError("Unknown compression type: '{}'".format(compression))
-        # print("Number of parameters in last layer: ", count_model_params(self.linear))
 
         self.relu = torch.nn.ReLU().to(device)
         
@@ -61,7 +61,7 @@ class SpeakerEncoder(nn.Module):
         self.similarity_bias.grad *= 0.01
             
         # Gradient clipping
-        clip_grad_norm_(self.parameters(), 3, norm_type=2)
+        clip_grad_norm_(self.parameters(), self.clip, norm_type=2)
     
     def forward(self, utterances, hidden_init=None):
         """

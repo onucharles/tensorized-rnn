@@ -21,7 +21,7 @@ from encoder import config
 
 def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: int,
           resume_experiment: bool, prev_exp_key: str, enable_comet: bool, gpu_no: int,
-          seed: int, train_frac: float):
+          seed: int, train_frac: float, log_grad: bool, clip: int):
     """
     Main entry point for training.
     """
@@ -42,7 +42,8 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
     device, loss_device = get_devices(gpu_no)
 
     model, optimizer, init_step, model_val_eer = \
-        create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id)
+        create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id,
+                                   clip)
 
     if pm.compression == 'tt':
         logger.set_name('tt-n{}-h{}-cores{}-r{}'.format(pm.model_num_layers,
@@ -75,6 +76,10 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
         loss.backward()
         model.do_gradient_ops()
         optimizer.step()
+        if log_grad:
+            grad_norm = compute_grad_norm(model)
+            # print('Norm of gradients: ', grad_norm)
+            logger.log_metric("grad_norm", grad_norm, step=step)
 
         logger.log_metrics({"EER": eer, "loss": loss.item()}, prefix="train", step=step)
         print("Step: {}\tTrain Loss: {}\tTrain EER: {}".format(step, loss.item(), eer))
@@ -105,6 +110,12 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
             embeds = embeds.detach().cpu().numpy()
             logger.draw_projections(embeds, pm.utterances_per_speaker, step, projection_fpath)
 
+def compute_grad_norm(model):
+    grads = []
+    for param in model.parameters():
+        grads.append(param.grad.cpu().detach().view(-1))
+    grads = torch.cat(grads)
+    return torch.norm(grads, p=2)
 
 def test(clean_data_root: Path, exp_root_dir: Path, prev_exp_key: str,
          enable_comet: bool, gpu_no: int):
@@ -225,12 +236,12 @@ def create_paths(data_dir, models_dir, run_id, enable_logging=False):
     return train_data_dir, val_data_dir, test_data_dir, params_fpath, state_fpath, umap_dir
 
 
-def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id):
+def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id, clip):
     # model
     model = SpeakerEncoder(pd.mel_n_channels, pm.model_hidden_size, pm.model_num_layers,
                            pm.model_embedding_size, device, loss_device,
                            compression=pm.compression, n_cores=pm.n_cores,
-                           rank=pm.rank)
+                           rank=pm.rank, clip=clip)
     # summary(model, (pd.partials_n_frames, pd.mel_n_channels))
     n_trainable, n_nontrainable = count_model_params(model)
     print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"
