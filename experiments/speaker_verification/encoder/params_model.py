@@ -5,7 +5,7 @@ model_embedding_size = 256
 model_num_layers = 1
 
 # Training parameters
-n_steps = 4e4
+n_steps = 2e4
 learning_rate_init = 2e-3
 speakers_per_batch = 16
 utterances_per_speaker = 32

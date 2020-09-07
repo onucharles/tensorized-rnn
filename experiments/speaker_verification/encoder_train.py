@@ -30,7 +30,10 @@ if __name__ == "__main__":
         "The index of GPU to use if multiple are available. If none, CPU will be used.")
     parser.add_argument("--seed", type=int, default=11, help= \
         "The random seed to use.")
+    parser.add_argument("--train_frac", type=float, default=1.0, help="Fraction of training data to use.")
     args = parser.parse_args()
+
+    assert 0.0 < args.train_frac <= 1.0
     
     # Process the arguments
     args.models_dir.mkdir(exist_ok=True)

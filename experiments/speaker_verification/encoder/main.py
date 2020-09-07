@@ -21,7 +21,7 @@ from encoder import config
 
 def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: int,
           resume_experiment: bool, prev_exp_key: str, enable_comet: bool, gpu_no: int,
-          seed: int):
+          seed: int, train_frac: float):
     """
     Main entry point for training.
     """
@@ -36,7 +36,7 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
 
     # setup dataset and model.
     set_seed(seed)
-    train_loader = create_train_loader(train_data_dir)
+    train_loader = create_train_loader(train_data_dir, train_frac)
     val_loader = create_test_loader(val_data_dir, pm.val_speakers_per_batch,
                                     pm.val_utterances_per_speaker, pd.partials_n_frames)
     device, loss_device = get_devices(gpu_no)
@@ -180,13 +180,13 @@ def evaluate(loader, model, speakers_per_batch, utterances_per_speaker, device, 
 
     return loss.item(), eer
 
-def create_train_loader(clean_data_root):
+def create_train_loader(clean_data_root, train_frac):
     # set dataset length to achieve desired no of training steps.
     train_dataset_len = pm.n_steps * pm.speakers_per_batch
 
     # Create datasets and dataloaders
     train_loader = SpeakerVerificationDataLoader(
-        SpeakerVerificationDataset(clean_data_root, train_dataset_len),
+        SpeakerVerificationDataset(clean_data_root, train_dataset_len, train_frac),
         pm.speakers_per_batch,
         pm.utterances_per_speaker,
         pd.partials_n_frames,

@@ -6,22 +6,28 @@ from joblib import Parallel, delayed
 
 
 class SpeakerVerificationDataset(Dataset):
-    def __init__(self, datasets_root, dataset_len):
+    def __init__(self, datasets_root, dataset_len, train_frac):
         """
         :param datasets_root:
         :param dataset_len: the number of pseudo-speakers in the dataset. Speakers are sampled
                             with replacement. Each time a speaker is returned, a random set of
                             utterances and random segment from each utterance is selected.
+        :param train_frac: the fraction of training set to use.
         """
         self.root = datasets_root
         speaker_dirs = [f for f in self.root.glob("*") if f.is_dir()]
-        if len(speaker_dirs) == 0:
+        n_speakers = len(speaker_dirs)
+        if n_speakers == 0:
             raise Exception("No speakers found. Make sure you are pointing to the directory "
                             "containing all preprocessed speaker directories.")
-        self.speakers = [Speaker(speaker_dir) for speaker_dir in speaker_dirs]
+
+        n_speakers_to_use = int(train_frac * n_speakers)
+        self.speakers = [Speaker(speaker_dir) for speaker_dir in speaker_dirs[:n_speakers_to_use]]
 
         self.speaker_cycler = RandomCycler(self.speakers)
         self.dataset_len = dataset_len
+
+        print("Training set - number of speakers is {} ({}% of total)".format(len(self.speakers), train_frac * 100))
 
     def __len__(self):
         return int(self.dataset_len)
