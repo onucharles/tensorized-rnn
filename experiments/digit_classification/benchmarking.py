@@ -1,5 +1,6 @@
 """
-Benchmarking runtime of digit classification models.
+Benchmarking runtime and memory usage.
+Code uses MNIST_Classifier class (an RNN + FC layer), but otherwise is independent of any experiment.
 """
 
 import torch
