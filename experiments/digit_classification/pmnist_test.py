@@ -52,6 +52,8 @@ parser.add_argument('--ttrank', type=int, default=2,
                     help='TT rank (default: 2)')
 parser.add_argument('--enable_logging', action='store_true',
                     help='Log metrics to Comet and save model to disk (default: False)')
+parser.add_argument('--extra_core', type=str, default='none',
+                    help='Where to place extra core, if any (options: none, first, last)')
 parser.add_argument('--log_grads', action='store_true',
                     help='Whether to log gradients and activations (default: False)')
 parser.add_argument("--gpu_no", type=int, default=0, help =\
@@ -63,17 +65,20 @@ if not args.tt:
     args.ncores = 1
     args.ttrank = 1
 
-if args.naive_tt and not args.tt:
-    warnings.warn("'naive_tt' is set to True but 'tt' is not. Model will be a regular RNN.")
+assert not (args.naive_tt and not args.tt)
+assert args.extra_core in ['none', 'first', 'last']
+if args.extra_core == 'none': args.extra_core = None
+# if args.naive_tt and not args.tt:
+#     warnings.warn("'naive_tt' is set to True but 'tt' is not. Model will be a regular RNN.")
 
 # create comet logger.
 logger = CometLogger(not args.enable_logging)
 run_id = logger.get_experiment_key()
 mod_name = 'gru' if args.gru else 'lstm'
 logger.log_params(vars(args))
-name = (f"{mod_name}-{'nv' if args.naive_tt else ''}"
-        f"{'tt' if args.tt else 'no-tt'}-n{args.n_layers}"
-        f"-h{args.hidden_size}-ncores{args.ncores}-rank{args.ttrank}")
+tt_prefix = 'no-tt' if not args.tt else ('nvtt' if args.naive_tt else 'tt')
+name = (f"{mod_name}-{tt_prefix}-n{args.n_layers}-h{args.hidden_size}"
+        f"-ncores{args.ncores}-rank{args.ttrank}")
 logger.set_name(name)
 
 # saved model path
@@ -114,15 +119,15 @@ train_loader, val_loader, test_loader = data_generator(root, batch_size)
 
 model = MNIST_Classifier(input_channels, n_classes, args.hidden_size, args.n_layers, device,
                          tt=args.tt, gru=args.gru, n_cores=args.ncores, 
-                         tt_rank=args.ttrank, log_grads=args.log_grads,
-                         naive_tt=args.naive_tt)
+                         tt_rank=args.ttrank, naive_tt=args.naive_tt, 
+                         log_grads=args.log_grads, extra_core=args.extra_core)
 n_trainable, n_nontrainable = count_model_params(model)
 print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"
       .format(n_trainable, n_nontrainable, n_trainable + n_nontrainable))
 
 # Setup activation and gradient logging
 if args.log_grads:
-    from tensorized_rnn.grad_tools import ActivGradLogger as AGL
+    from tensorized_rnn.rnn_utils import ActivGradLogger as AGL
 
 permute = torch.Tensor(np.random.permutation(784).astype(np.float64)).long()
 if args.cuda:
@@ -215,7 +220,7 @@ def test(test_model, loader, val_or_test="val"):
 
 if __name__ == "__main__":
     import os.path
-    from tensorized_rnn.grad_tools import ActivGradLogger as AGL
+    from tensorized_rnn.rnn_utils import ActivGradLogger as AGL
     start = time()
 
     for epoch in range(1, epochs+1):

@@ -3,6 +3,7 @@ from collections import deque
 import torch
 
 from t3nsor.tensor_train import TensorTrain, TensorTrainBatch
+from t3nsor.utils import auto_shape
 """
 ## NOTE ON TT FORMATTING
 
@@ -16,6 +17,27 @@ the TT matrices, and is identical in all tensor cores of the TT mat.
 The left/right global matrix dimensions are the product of the left/right
 local matrix dimensions.
 """
+def tt_shape(in_features, out_features, n_cores, n_gates, new_core=None):
+    """Determine custom shapes for the TT cores"""
+    assert new_core in [None, 'first', 'last']
+
+    if new_core is None:
+        out_features *= n_gates
+    in_quant = [int(n) for n in auto_shape(in_features, d=n_cores)]
+    out_quant = [int(n) for n in auto_shape(out_features, d=n_cores)]
+
+    if new_core == 'first':
+        in_quant = [1] + in_quant
+        out_quant = [n_gates] + out_quant
+    elif new_core == 'last':
+        in_quant = in_quant + [1]
+        out_quant = out_quant + [n_gates]
+        
+    return [in_quant, out_quant]
+    # TTLinear(in_features=in_features, out_features=out_features,
+    #                             bias=bias, auto_shapes=auto_shapes, d=d, tt_rank=tt_rank,
+    #                             init=init, shape=shape, auto_shape_mode=auto_shape_mode,
+    #                             auto_shape_criterion=auto_shape_criterion)
 
 class ActivGradLogger():
     # Global info for dealing with different loggers

@@ -97,7 +97,6 @@ class TTLinear(nn.Module):
                 out_features, d=d, criterion=auto_shape_criterion, mode=auto_shape_mode)
 
             shape = [in_quantization, out_quantization]
-            print('Created TTLinear layer with input shape: {}. output shape: {}'.format(in_quantization, out_quantization))
 
 
         if init is None:
@@ -117,6 +116,7 @@ class TTLinear(nn.Module):
             self.bias = torch.nn.Parameter(1e-3 * torch.ones(out_features))
         else:
             self.register_parameter('bias', None)
+        print('Created TTLinear layer with input shape: {}. output shape: {}'.format(shape[0], shape[1]))
 
     def forward(self, x):
         weight_t = self.weight_t

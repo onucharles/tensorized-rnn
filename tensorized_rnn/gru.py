@@ -2,9 +2,9 @@ import torch
 from torch import nn
 from t3nsor.layers import TTLinear
 
-from .grad_tools import ActivGradLogger
-from .grad_tools import param_count as pc
-
+from .rnn_utils import ActivGradLogger, tt_shape
+from .rnn_utils import param_count as pc
+from .tt_linearset import TTLinearSet
 
 class GRUCell(nn.Module):
     def __init__(self, input_size, hidden_size, bias, device):
@@ -137,36 +137,58 @@ class GRU(nn.Module):
 
 
 class TTGRUCell(GRUCell):
-    def __init__(self, input_size, hidden_size, bias, device, n_cores, tt_rank):
+    def __init__(self, input_size, hidden_size, bias, device, n_cores, tt_rank,
+                 is_naive=False, new_core=None):
         self.n_cores = n_cores
         self.tt_rank = tt_rank
+        self.is_naive = is_naive
+        self.new_core = new_core
         super().__init__(input_size, hidden_size, bias, device)
 
     def _create_input_hidden_weights(self):
-        return TTLinear(in_features=self.input_size, 
-                        out_features=3*self.hidden_size,
-                        bias=self.bias, auto_shapes=True, 
-                        d=self.n_cores, tt_rank=self.tt_rank).to(self.device)
-
+        if self.is_naive:
+            return TTLinearSet(in_features=self.input_size, 
+                               out_features=self.hidden_size, n_gates=3,
+                               bias=self.bias, auto_shapes=True, 
+                               d=self.n_cores, tt_rank=self.tt_rank).to(self.device)
+        else:
+            shape = tt_shape(self.input_size, self.hidden_size, 
+                             self.n_cores, 3, new_core=self.new_core)
+            return TTLinear(out_features=3*self.hidden_size, shape=shape, 
+                            bias=self.bias, auto_shapes=False, d=self.n_cores, 
+                            tt_rank=self.tt_rank).to(self.device)
+            
     def _create_hidden_hidden_weights(self):
-        return TTLinear(in_features=self.hidden_size, 
-                        out_features=3*self.hidden_size,
-                        bias=self.bias, auto_shapes=True, 
-                        d=self.n_cores, tt_rank=self.tt_rank).to(self.device)
+        if self.is_naive:
+            return TTLinearSet(in_features=self.hidden_size, 
+                               out_features=self.hidden_size, n_gates=3,
+                               bias=self.bias, auto_shapes=True, 
+                               d=self.n_cores, tt_rank=self.tt_rank).to(self.device)
+        else:
+            shape = tt_shape(self.hidden_size, self.hidden_size, 
+                             self.n_cores, 3, new_core=self.new_core)
+            return TTLinear(out_features=3*self.hidden_size, shape=shape, 
+                            bias=self.bias, auto_shapes=False, d=self.n_cores, 
+                            tt_rank=self.tt_rank).to(self.device)
 
 
 class TTGRU(GRU):
     def __init__(self, input_size, hidden_size, num_layers, device, n_cores, 
-                 tt_rank, bias=True, log_grads=False):
+                 tt_rank, bias=True, is_naive=False, log_grads=False, new_core=None):
+        assert new_core in [None, 'first', 'last']
         self.n_cores = n_cores
         self.tt_rank = tt_rank
+        self.is_naive = is_naive
+        self.new_core = new_core
         super().__init__(input_size, hidden_size, num_layers, device, bias,
                          log_grads=log_grads)
 
     def _create_first_layer_cell(self):
         return TTGRUCell(self.input_size, self.hidden_size, self.bias, self.device,
-                          n_cores=self.n_cores, tt_rank=self.tt_rank)
+                          n_cores=self.n_cores, tt_rank=self.tt_rank, 
+                          is_naive=self.is_naive, new_core=self.new_core)
 
     def _create_other_layer_cell(self):
         return TTGRUCell(self.hidden_size, self.hidden_size, self.bias, self.device,
-                          n_cores=self.n_cores, tt_rank=self.tt_rank)
+                          n_cores=self.n_cores, tt_rank=self.tt_rank, 
+                          is_naive=self.is_naive, new_core=self.new_core)
