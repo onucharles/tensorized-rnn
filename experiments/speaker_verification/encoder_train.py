@@ -33,6 +33,8 @@ if __name__ == "__main__":
     parser.add_argument("--train_frac", type=float, default=1.0, help="Fraction of training data to use.")
     parser.add_argument("--log_grad", action="store_true", help="Log gradients.")
     parser.add_argument("--clip", type=int, default=3, help="The max norm for gradient clipping.")
+    parser.add_argument('--use_gru', action='store_true',
+                        help='Use GRU instead of LSTM')
 
     args = parser.parse_args()
 

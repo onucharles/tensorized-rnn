@@ -1,6 +1,6 @@
 COMET_API_KEY = "hRTMB66l59BMb9pPrRzLrbzwp"
 COMET_WORKSPACE = "tensorized-rnn"
-PROJECT_NAME = "speaker-verification-loggrad"
+PROJECT_NAME = "speaker-verification-gru"
 
 TRAIN_DATA_FOLDER = "_librispeech_train-clean-100_tisv"
 VAL_DATA_FOLDER = "_librispeech_dev-clean_tisv"

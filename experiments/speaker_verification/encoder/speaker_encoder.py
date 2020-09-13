@@ -11,17 +11,18 @@ from t3nsor.layers import TTLinear
 from utils.modelutils import count_model_params
 from tensorized_rnn.lstm import LSTM
 from tensorized_rnn.tt_lstm import TTLSTM
-from tensorized_rnn.lr_linear import LRLinear
+from tensorized_rnn.gru import GRU, TTGRU
 
 
 class SpeakerEncoder(nn.Module):
     def __init__(self, mel_n_channels, model_hidden_size, model_num_layers,
                  model_embedding_size, device, loss_device, compression=None,
-                 n_cores=3, rank=8, clip=3):
+                 n_cores=3, rank=8, clip=3, use_gru=False):
         super().__init__()
 
         self.loss_device = loss_device
         self.clip = clip
+        self.use_gru = use_gru
 
         # Network definition
         if compression is None:
@@ -29,18 +30,20 @@ class SpeakerEncoder(nn.Module):
             #                     hidden_size=model_hidden_size,
             #                     num_layers=model_num_layers,
             #                     batch_first=True).to(device)
-            self.lstm = LSTM(mel_n_channels, model_hidden_size, model_num_layers, device)
+            if not use_gru:
+                self.rnn = LSTM(mel_n_channels, model_hidden_size, model_num_layers, device)
+            else:
+                self.rnn = GRU(mel_n_channels, model_hidden_size, model_num_layers, device)
             self.linear = nn.Linear(in_features=model_hidden_size,
                                  out_features=model_embedding_size).to(device)
-        elif compression == 'lr':
-            print("Encoding linear layer via low-rank matrix factorisation...")
-            self.linear = LRLinear(in_features=model_hidden_size,
-                                   out_features=model_embedding_size, rank=rank).to(device)
-            raise ValueError("Low rank LSTM not implemented.")
         elif compression == 'tt':
             print("Encoding linear layer as a tensor-train...")
-            self.lstm = TTLSTM(mel_n_channels, model_hidden_size, model_num_layers, device,
-                               bias=True, n_cores=n_cores, tt_rank=rank)
+            if not use_gru:
+                self.rnn = TTLSTM(mel_n_channels, model_hidden_size, model_num_layers, device,
+                                  n_cores=n_cores, tt_rank=rank)
+            else:
+                self.rnn = TTGRU(mel_n_channels, model_hidden_size, model_num_layers, device,
+                                 bias=True, n_cores=n_cores, tt_rank=rank)
             self.linear = TTLinear(in_features=model_hidden_size, out_features=model_embedding_size,
                                    bias=True, auto_shapes=True, d=n_cores, tt_rank=rank).to(device)
         else:
@@ -73,13 +76,13 @@ class SpeakerEncoder(nn.Module):
         batch_size, hidden_size). Will default to a tensor of zeros if None.
         :return: the embeddings as a tensor of shape (batch_size, embedding_size)
         """
-        # # Pass the input through the LSTM layers and retrieve all outputs, the final hidden state
-        # # and the final cell state.
-        # out, (hidden, cell) = self.lstm(utterances, hidden_init)
-        #
-        # # We take only the hidden state of the last layer
-        # embeds_raw = self.relu(self.linear(hidden[-1]))
-        out, (last_hidden, last_cell) = self.lstm(utterances)
+
+        if not self.use_gru:
+            out, (last_hidden, last_cell) = self.rnn(utterances)
+        else:
+            out, last_hidden = self.rnn(utterances)
+
+        # We take only the hidden state of the last layer
         embeds_raw = self.relu(self.linear(last_hidden))
         
         # L2-normalize it

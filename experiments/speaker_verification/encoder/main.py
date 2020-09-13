@@ -21,7 +21,7 @@ from encoder import config
 
 def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: int,
           resume_experiment: bool, prev_exp_key: str, enable_comet: bool, gpu_no: int,
-          seed: int, train_frac: float, log_grad: bool, clip: int):
+          seed: int, train_frac: float, log_grad: bool, clip: int, use_gru: bool):
     """
     Main entry point for training.
     """
@@ -43,7 +43,7 @@ def train(clean_data_root: Path, models_dir: Path, umap_every: int, val_every: i
 
     model, optimizer, init_step, model_val_eer = \
         create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id,
-                                   clip)
+                                   clip, use_gru)
 
     if pm.compression == 'tt':
         logger.set_name('tt-n{}-h{}-cores{}-r{}'.format(pm.model_num_layers,
@@ -236,12 +236,13 @@ def create_paths(data_dir, models_dir, run_id, enable_logging=False):
     return train_data_dir, val_data_dir, test_data_dir, params_fpath, state_fpath, umap_dir
 
 
-def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id, clip):
+def create_model_and_optimizer(device, loss_device, resume_experiment, state_fpath, run_id, clip,
+                               use_gru=False):
     # model
     model = SpeakerEncoder(pd.mel_n_channels, pm.model_hidden_size, pm.model_num_layers,
                            pm.model_embedding_size, device, loss_device,
                            compression=pm.compression, n_cores=pm.n_cores,
-                           rank=pm.rank, clip=clip)
+                           rank=pm.rank, clip=clip, use_gru=use_gru)
     # summary(model, (pd.partials_n_frames, pd.mel_n_channels))
     n_trainable, n_nontrainable = count_model_params(model)
     print("Model instantiated. Trainable params: {}, Non-trainable params: {}. Total: {}"
