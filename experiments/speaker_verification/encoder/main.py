@@ -118,7 +118,7 @@ def compute_grad_norm(model):
     return torch.norm(grads, p=2)
 
 def test(clean_data_root: Path, exp_root_dir: Path, prev_exp_key: str,
-         enable_comet: bool, gpu_no: int):
+         enable_comet: bool, gpu_no: int, use_gru: bool):
     """
     Main entry point for testing.
     """
@@ -141,7 +141,7 @@ def test(clean_data_root: Path, exp_root_dir: Path, prev_exp_key: str,
     model = SpeakerEncoder(pd.mel_n_channels, pm.model_hidden_size, pm.model_num_layers,
                            pm.model_embedding_size, device, loss_device,
                            compression=pm.compression, n_cores=pm.n_cores,
-                           rank=pm.rank)
+                           rank=pm.rank, use_gru=use_gru)
     if state_fpath.exists():
         print("Found existing model \"%s\", loading it." % state_fpath)
         checkpoint = torch.load(state_fpath)

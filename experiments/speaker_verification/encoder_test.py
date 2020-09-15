@@ -19,6 +19,8 @@ if __name__ == "__main__":
         "Enable logging to comet or file system.")
     parser.add_argument("--gpu_no", type=int, default=0, help =\
         "The index of GPU to use if multiple are available. If none, CPU will be used.")
+    parser.add_argument('--use_gru', action='store_true',
+                        help='Use GRU instead of LSTM')
     args = parser.parse_args()
 
     # Run the test
