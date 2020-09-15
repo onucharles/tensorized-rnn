@@ -3,6 +3,7 @@ data/
 
 # settings file
 settings.py
+config.py
 
 # pycharm
 .idea/

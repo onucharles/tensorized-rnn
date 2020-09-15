@@ -6,8 +6,8 @@ import numpy as np
 import random
 import warnings
 import json
-from torchsummary import summary
-from GPUtil import showUtilization as gpu_usage
+# from torchsummary import summary
+# from GPUtil import showUtilization as gpu_usage
 
 from encoder.data_objects import SpeakerVerificationDataLoader, SpeakerVerificationDataset, \
     SpeakerVerificationTestSet, SpeakerVerificationTestDataLoader

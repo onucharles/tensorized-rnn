@@ -7,8 +7,8 @@ model_num_layers = 1
 # Training parameters
 n_steps = 2e4
 learning_rate_init = 1e-3
-speakers_per_batch = 5 #16
-utterances_per_speaker = 5 #32
+speakers_per_batch = 16
+utterances_per_speaker = 32
 
 ## Tensor-train parameters for last linear layer.
 compression = 'tt'
