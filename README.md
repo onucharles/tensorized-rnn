@@ -1,6 +1,6 @@
 # Tensorizing recurrent neural network architectures for model compression
 
-[Paper]()
+[Paper](https://arxiv.org/abs/2010.04196)
 
 ### Repository structure
 * ``tensorized_rnn`` contains our implementations of GRU and LSTM as well as their tensorized counterparts, 
@@ -54,5 +54,5 @@ python encoder_train.py --clean_data_root /path/to/output/dir -m /dir/to/save/mo
 
 If you use this code in your research, please cite our work:
 ```
-Coming soon...
+Onu, C. C., Miller, J. E., & Precup, D. (2020). A Fully Tensorized Recurrent Neural Network. arXiv preprint arXiv:2010.04196.
 ```
